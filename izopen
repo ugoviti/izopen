@@ -45,6 +45,7 @@ izopen_tmp_socks_all="$izopen_tmp/socks_all.conf"
 izopen_tmp_socks_last="$izopen_tmp/socks_last.conf"
 tunnel_ports_start=2000
 
+[ -f "/tmp/izopen.conf" ] && . /tmp/izopen.conf
 
 # commands helper functions
 #########################################################################
@@ -363,6 +364,10 @@ parse_uri() {
 }
 
 case $1 in 
+  switch)
+	[ -f "/tmp/izopen.conf" ] && . /tmp/izopen.conf
+	[ "$tunnel_use_force_ssh" = "0" ] && echo "tunnel_use_force_ssh=1" > /tmp/izopen.conf || echo "tunnel_use_force_ssh=0" > /tmp/izopen.conf
+	;;
   tunnel)
 	shift
 	tunnel_create=1
