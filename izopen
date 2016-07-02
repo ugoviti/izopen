@@ -72,6 +72,9 @@ helper_ssh() {
 
 
 helper_rdp() {
+  helper_cmd_rdp="rdesktop"
+  #helper_cmd_rdp="xfreerdp"
+
   # extract domain from username and convert to the right name
   domain="$(echo "$username" | awk -F"/" '{print $1}')"
   username="$(echo "$username" | awk -F"/" '{print $2}')"
@@ -79,7 +82,7 @@ helper_rdp() {
   [ -z "$username" ] && username=$domain && unset domain
   #username="$(echo "$username" | sed 's/\//\\\\/g')"
   #helper_cmd="rdesktop -k it -g 1024x720 $opts $([ -n "$domain" ] && echo "-d \"$domain\"") $([ -n "$username" ] && echo "-u \"$username\"")  $([ -n "$password" ] && echo "-p \"$password\"") $host$([ -n "$port" ] && echo ":$port")"
-  helper_cmd="rdesktop -k it -g 1280x780 $opts $([ -n "$domain" ] && echo "-d \"$domain\"") $([ -n "$username" ] && echo "-u \"$username\"")  $([ -n "$password" ] && echo "-p \"$password\"") $host$([ -n "$port" ] && echo ":$port")"
+  helper_cmd="$helper_cmd_rdp -k it -g 1280x780 $opts $([ -n "$domain" ] && echo "-d \"$domain\"") $([ -n "$username" ] && echo "-u \"$username\"")  $([ -n "$password" ] && echo "-p \"$password\"") $host$([ -n "$port" ] && echo ":$port")"
 }
 
 helper_vnc() {
@@ -178,6 +181,8 @@ helper_tunnel() {
 
  # ask for a port if we want use a tunnel
  [ $tunnel_use = 1 ] && tunnel_port_use=$(zenity --entry --entry-text=$tunnel_ports_last --text="Inserire la porta del Proxy Socks\nCompresa fra $tunnel_ports_start e $tunnel_ports_all\n" 2>/dev/null)
+ # save the last used/reused port
+ echo $tunnel_port_use > "$izopen_tmp_socks_last"
 
  # debug
  #echo tunnel_create=$tunnel_create
@@ -381,7 +386,7 @@ case $1 in
        *)
 	[ $tunnel_create_force = 1 ] && tunnel_create=1
 	[ $tunnel_use_force = 1 ] && tunnel_use=1
-	open_uri "$@"
+	open_uri "$@" >/tmp/izopen.log 2>&1
 	;;
 esac
 
