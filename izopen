@@ -180,9 +180,11 @@ helper_tunnel() {
  [ "$protocol" = "ssh" ] && helper_tunnel_create
 
  # ask for a port if we want use a tunnel
- [ $tunnel_use = 1 ] && tunnel_port_use=$(zenity --entry --entry-text=$tunnel_ports_last --text="Inserire la porta del Proxy Socks\nCompresa fra $tunnel_ports_start e $tunnel_ports_all\n" 2>/dev/null)
- # save the last used/reused port
- echo $tunnel_port_use > "$izopen_tmp_socks_last"
+ if [ $tunnel_use = 1 ] ; then
+   tunnel_port_use=$(zenity --entry --entry-text=$tunnel_ports_last --text="Inserire la porta del Proxy Socks\nCompresa fra $tunnel_ports_start e $tunnel_ports_all\n" 2>/dev/null)
+   # save the last used/reused port
+   [ ! -z "$tunnel_port_use" ] && echo $tunnel_port_use > "$izopen_tmp_socks_last"
+ fi
 
  # debug
  #echo tunnel_create=$tunnel_create
