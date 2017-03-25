@@ -2,8 +2,8 @@
 # multi protocol bash script to auto opening given URI and auto creating ssh reverse tunnel socks proxy
 # very useful to use KeePassX as secure URI launcher
 # Written by Ugo Viti <ugo.viti@initzero.it>
-#    date: 20160118
-# version: 2.0
+#    date: 20161117
+# version: 2.1
 
 # features:
 #    URI handling of: ssh, rdp, vnc, sftp, ftp, http, https, smb and cifs protocols
@@ -50,7 +50,17 @@ tunnel_ports_start=2000
 # commands helper functions
 #########################################################################
 helper_ssh() {
-  helper_cmd_terminal="mate-terminal"
+  if   [ "$XDG_CURRENT_DESKTOP" = "MATE" ]; then
+    helper_cmd_terminal="$(gsettings get org.mate.applications-terminal exec | tr -d \')"
+  elif [ "$XDG_CURRENT_DESKTOP" = "GNOME" ]; then
+    helper_cmd_terminal="$(gsettings get org.gnome.desktop.default-applications.terminal exec | tr -d \')"
+  elif [ "$XDG_CURRENT_DESKTOP" = "KDE" ]; then
+    helper_cmd_terminal="$(kreadconfig --file kdeglobals --group General --key TerminalApplication| tr -d \')"
+   else
+    helper_cmd_terminal="terminator"
+  fi
+
+  #helper_cmd_terminal="mate-terminal"
   #helper_cmd_terminal="terminator"
   #helper_cmd_terminal="gnome-terminal"
   #helper_cmd_terminal="konsole"
@@ -70,10 +80,31 @@ helper_ssh() {
   #helper_cmd_ssh_opts="-t \"export PS1='\e[0;31m[\u@\h \W]\$ \e[m '; exec bash\""
 }
 
+helper_telnet() {
+  helper_cmd_terminal="mate-terminal"
+  #helper_cmd_terminal="terminator"
+  #helper_cmd_terminal="gnome-terminal"
+  #helper_cmd_terminal="konsole"
+  #helper_cmd_terminal="xfce4-terminal"
+
+  [ -z "$username" ] && read -p "username: " username;
+  #[ -z "$password" ] && read -p "password: " password;
+  
+  helper_cmd_opts="$helper_cmd_opts $opts $host $([ -n "$port" ] && echo "-p $port")"
+
+  # set the final command
+  helper_cmd="$helper_cmd_terminal -e \"telnet $helper_cmd_opts\" --title \"$([ "$tunnel_create" = 1 ] && echo "$host Tunnel: $tunnel_port_create" || echo "$host")\""
+
+  ####################### 
+  # test colorized prompt
+  #helper_cmd="gnome-terminal -e \"ssh $([ -n "$port" ] && echo "-p $port") $username@$host $opts\""
+  #helper_cmd_ssh_opts="-t \"export PS1='\e[0;31m[\u@\h \W]\$ \e[m '; exec bash\""
+}
+
 
 helper_rdp() {
-  helper_cmd_rdp="rdesktop"
-  #helper_cmd_rdp="xfreerdp"
+  #helper_cmd_rdp="rdesktop"
+  helper_cmd_rdp="xfreerdp"
 
   # extract domain from username and convert to the right name
   domain="$(echo "$username" | awk -F"/" '{print $1}')"
@@ -81,8 +112,15 @@ helper_rdp() {
   password="$(echo "$password" | sed 's/\%25/\%/g')" # % key workaround
   [ -z "$username" ] && username=$domain && unset domain
   #username="$(echo "$username" | sed 's/\//\\\\/g')"
-  #helper_cmd="rdesktop -k it -g 1024x720 $opts $([ -n "$domain" ] && echo "-d \"$domain\"") $([ -n "$username" ] && echo "-u \"$username\"")  $([ -n "$password" ] && echo "-p \"$password\"") $host$([ -n "$port" ] && echo ":$port")"
-  helper_cmd="$helper_cmd_rdp -k it -g 1280x780 $opts $([ -n "$domain" ] && echo "-d \"$domain\"") $([ -n "$username" ] && echo "-u \"$username\"")  $([ -n "$password" ] && echo "-p \"$password\"") $host$([ -n "$port" ] && echo ":$port")"
+  case $helper_cmd_rdp in
+    rdesktop)
+      helper_cmd="$helper_cmd_rdp -k it -g 1280x780 $opts $([ -n "$domain" ] && echo "-d \"$domain\"") $([ -n "$username" ] && echo "-u \"$username\"")  $([ -n "$password" ] && echo "-p \"$password\"") $host$([ -n "$port" ] && echo ":$port")"
+      ;;
+    xfreerdp)
+      helper_cmd="$helper_cmd_rdp +clipboard /kbd:Italian /size:95% /cert-tofu /cert-ignore $opts $([ -n "$domain" ] && echo "/d:\"$domain\"") $([ -n "$username" ] && echo "/u:'$username'")  $([ -n "$password" ] && echo "/p:'$password'") /v:"$host"$([ -n "$port" ] && echo ":$port")"
+      ;;
+  esac
+
 }
 
 helper_vnc() {
@@ -91,7 +129,8 @@ helper_vnc() {
 }
 
 helper_sftp() {
-  helper_cmd="xdg-open \"$args\""
+  #helper_cmd="xdg-open \"$args\""
+  helper_cmd="helper_ssh \"$args\""
 }
 
 helper_ftp() {
@@ -206,37 +245,7 @@ helper_tunnel() {
  [ -z $tunnel_port_use ] && tunnel_use=0
 }
 
-open_uri() {
-  local uri="$1"
-  local args="$@"
-  shift
-  local opts="$@"
-  parse_uri "$(echo $uri | sed s/\*/\\\WILDCARD/g)"
-
-
-  ##
-  ## customize the following uri for command associations:
-  ##
-  case ${protocol} in
-        ssh|rdp|vnc|sftp|ftp|http|https|about|smb|cifs)
-		# create or use ssh tunnel if required
-		[[ "$tunnel_create" = 1 || "$tunnel_use" = 1 ]] && helper_tunnel "$args"
-		# obtain commands to use to connect
-		helper_${protocol} "$args"
-		# because google chrome doesn't works with proxychains, I don't use it
-		if [[ "$protocol" = "http" && $helper_http_chrome = 1 ]]; then
-		  helper_cmd="$helper_cmd"
-		else
-		  helper_cmd="$helper_cmd_prepend $helper_cmd"
-		fi
-		# connect to remote server
-		eval "$helper_cmd"
-		;;
-        *)
-		echo "ERROR: invalid URI specified: $args"
-		;;
-  esac
-
+print_debug() {
   if [ $debug = 1 ]; then
 	# print the parsed fields
 	echo "========================================================================================"
@@ -252,7 +261,43 @@ open_uri() {
 	echo "   uri tmp: $uritmp"
 	echo "helper cmd: $helper_cmd"
 	echo "========================================================================================"
-  fi #> /tmp/izopen.log
+  fi | tee -a /tmp/izopen.log
+}
+
+open_uri() {
+  local uri="$1"
+  local args="$@"
+  shift
+  local opts="$@"
+  #parse_uri "$(echo $uri | sed s/\*/\\\WILDCARD/g)"
+  url_parse "$uri"
+
+  # workarounds
+  [ "${protocol}" = "sftp" ] && protocol="ssh" # force ssh with sftp url
+
+  ##
+  ## customize the following uri for command associations:
+  ##
+  case ${protocol} in
+        ssh|telnet|rdp|vnc|sftp|ftp|http|https|about|smb|cifs)
+		# create or use ssh tunnel if required
+		[[ "$tunnel_create" = 1 || "$tunnel_use" = 1 ]] && helper_tunnel "$args"
+		# obtain commands to use to connect
+		helper_${protocol} "$args"
+		# because google chrome doesn't works with proxychains, I don't use it
+		if [[ "$protocol" = "http" && $helper_http_chrome = 1 ]]; then
+		  helper_cmd="$helper_cmd"
+		else
+		  helper_cmd="$helper_cmd_prepend $helper_cmd"
+		fi
+		[ $debug = 1 ] && print_debug
+		# connect to remote server
+		eval "$helper_cmd"
+		;;
+        *)
+		echo "ERROR: invalid URI specified: $args"
+		;;
+  esac
 }
 
 
@@ -260,115 +305,76 @@ open_uri() {
 #      args: $1
 # args desc: 'URI'
 #    return: misc variables containing the URI data
-parse_uri() {
-  #      desc: set in the uritmp variable the URI given
-  #      args: $1
-  # args desc: 'URI'
-  #    return: none
-  parse_uri_set_uritmp() {
-        uritmp="$(echo ${uritmp} | awk -F "$1" '{print $2}')"
-  }
+url_parse() {
+    local query1 query2 path1 path2
 
-  #      desc: check if the uri contain invalid character
-  #      args: $1
-  # args desc: 'URI'
-  #    return: print the sanitized version of the given uri
-  parse_uri_check_uri() {
-        echo $1 | tr -d [:alnum:] | tr -d "." | tr -d "-" | tr -d "_" | tr -d ":" | tr -d "/" | tr -d "@" | tr -d "$" | tr -d "~"
-  }
+    # extract the protocolcol
+    protourl="$(echo $1 | grep :// | sed -e's,^\(.*://\).*,\1,g')"
+    protocol="$(echo $protourl | cut -d":" -f1 )"
 
-  #      desc: check if the host contain invalid characters and print a sanitized version
-  #      args: $1
-  # args desc: 'URI'
-  #    return: print the sanitized hostname given
-  parse_uri_check_host() {
-        echo $1 | tr -d [:alnum:] | tr -d "." | tr -d "-" | tr -d ":" | tr -d "/"
-  }
+    if [[ ! -z $protocol ]] ; then
+            # remove the protocol
+            url="$(echo ${1/$protourl/})"
 
-  #      desc: unset all used variables by parse_uri function
-  #      args: none
-  # args desc: none
-  #    return: none
-  parse_uri_unset_variables() {
-        unset protocol username password host port path
-  }
+            # extract the user (if any)
+            login="$(echo $url | grep @ | cut -d@ -f1)"
+            username="$(echo $login | cut -d: -f1)"
+            password="$(echo $login | grep : | cut -d: -f2)"
 
-  # copy to uritmp variable the given URI string
-  local uritmp=$1
+            # extract the host
+            hostport="$(echo ${url/$login@/} | cut -d/ -f1)"
+            host="$(echo ${hostport} | cut -d: -f1)"
 
-  # assure that doesn't exist already variables used by this function
-  parse_uri_unset_variables
+            # by request - try to extract the port
+            port="$(echo $hostport | grep ":" | sed -e 's,^.*:,:,g' -e 's,.*:\([0-9]*\).*,\1,g' -e 's,[^0-9],,g')"
 
-  # set the standard RFC URI delimiters
-  local uri_delimiter="://"
-  local username_delimiter="@"
-  local password_delimiter=":"
-  local port_delimiter=":"
-  local path_delimiter="/"
-
-  # return 0 if no uri is passed to this function
-  [ -z "$(echo ${uritmp})" ] && parse_uri_unset_variables && return 0
-  # return 1 if the uri doesn't contain the standard uri delimiter
-  [ -z "$(echo ${uritmp} | grep ${uri_delimiter})" ] && parse_uri_unset_variables && return 1
-
-  # set the used protocol
-  protocol="$(echo ${uritmp} | awk -F "${uri_delimiter}" '{print $1}')" ; parse_uri_set_uritmp "${protocol}${uri_delimiter}"
-
-  # file:// uri workaround
-  # because this special uri doesn't contain a host declaration, modify the uri before parsing it
-  [ "${protocol}" = "file" ] && uritmp="localhost/${uritmp}"
-
-  # check if the server uri contain a username or password
-  if [ -n "$(echo ${uritmp} | grep "${username_delimiter}")" ]
-    then
-      username="$(echo ${uritmp} | sed "s/${username_delimiter}.*//g")" ; parse_uri_set_uritmp "${username}${username_delimiter}"
-
-      # check if the uri contain the password
-      if [ -n "$(echo "${username}" | grep "${password_delimiter}")" ]
-        then
-          password="$(echo "${username}" | awk -F "${password_delimiter}" '{print $2}' | sed s/WILDCARD/\\\*/g)"
-          username="$(echo "${username}" | awk -F "${password_delimiter}" '{print $1}')"
-          # normalize password if problematic characters are found
-          #password="$(echo "${password}" | sed s/\!/\\"\!"/g | sed s/\'/\\"\'"/g | sed s/\*/\\"\*"/g)"
-          # convert %3E to >
-          #password="$(echo "${password}" | sed s/\%3E/\>/g)"
-      fi
-
-      # stop if no username is set, like wrong written uri with multiple "@" or ":" 
-      [ -z "${username}" ] && parse_uri_unset_variables && return 1
-  fi
-
-  # stop if the uri contain invalid caracters
-  [ -n "$(parse_uri_check_uri "${uritmp}")" ] && parse_uri_unset_variables && return 1
-
-  # check if the uri contain a port number
-  if [ -n "$(echo ${uritmp} | grep "${port_delimiter}")" ]
-    then
-     host="$(echo ${uritmp} | awk -F "${port_delimiter}" '{print $1}')" ; parse_uri_set_uritmp "${host}"
-     port="$(echo ${uritmp} | awk -F "${port_delimiter}" '{print $2}' | awk -F "${path_delimiter}" '{print $1}')" ; parse_uri_set_uritmp "${port_delimiter}${port}${path_delimiter}"
-     path="$(echo ${uritmp})" ; parse_uri_set_uritmp "${path}"
+            # extract the uri (if any)
+            resource="/$(echo $url | grep / | cut -d/ -f2-)"
     else
-     host="$(echo ${uritmp} | sed 's/^\/*//g' | awk -F "${path_delimiter}" '{print $1}')" ; parse_uri_set_uritmp "${host}${path_delimiter}"
-     path="$(echo ${uritmp})" ; parse_uri_set_uritmp "${path}"
-  fi
+            url=""
+            login=""
+            username=""
+            password=""
+            host=""
+            hostname=""
+            port=""
+            resource=$1
+    fi
 
-  # stop if the host contain invalid caracters
-  [ -n "$(parse_uri_check_host "${host}")" ] && parse_uri_unset_variables && return 1
+    # extract the path (if any)
+    path1="$(echo $resource | grep ? | cut -d? -f1 )"
+    path2="$(echo $resource | grep \# | cut -d# -f1 )"
+    path=$path1
+    if [[ -z $path ]] ; then path=$path2 ; fi
+    if [[ -z $path ]] ; then path=$resource ; fi
 
-  # hide the user password in the uri variable
-  if   [[ -n "${password}" && -n "${port}" ]]
-    then
-     uri="${protocol}${uri_delimiter}${username}${password_delimiter}xxxxxxxx${username_delimiter}${host}${port_delimiter}${port}${path_delimiter}${path}"
-  elif [[ -n "${password}" && -z "${port}" ]]
-    then
-     uri="${protocol}${uri_delimiter}${username}${password_delimiter}xxxxxxxx${username_delimiter}${host}${path_delimiter}${path}"
-  elif [ -z "${password}" ]
-    then
-     uri=$1
-  fi
+    # extract the query (if any)
+    query1="$(echo $resource | grep ? | cut -d? -f2-)"
+    query2="$(echo $query1 | grep \# | cut -d\# -f1 )"
+    query=$query2
+    if [[ -z $query ]] ; then query=$query1 ; fi
 
-  unset uritmp
+    # extract the fragment (if any)
+    fragment="$(echo $resource | grep \# | cut -d\# -f2 )"
+
+    url="$protourl$url"
+
+    if [ $debug = 2 ]; then
+     echo "url: $url"
+     echo "protocol: $protocol"
+     echo "   login: $login"
+     echo "username: $username"
+     echo "password: $password"
+     echo "    host: $host"
+     echo "    port: $port"
+     echo "resource: $resource"
+     echo "    path: $path"
+     echo "   query: $query"
+     echo "fragment: $fragment"
+     echo ""
+    fi
 }
+
 
 case $1 in 
   switch)
@@ -388,7 +394,7 @@ case $1 in
        *)
 	[ $tunnel_create_force = 1 ] && tunnel_create=1
 	[ $tunnel_use_force = 1 ] && tunnel_use=1
-	open_uri "$@" >/tmp/izopen.log 2>&1
+	open_uri "$@" 2>&1 | tee -a /tmp/izopen.log 2>&1
 	;;
 esac
 
