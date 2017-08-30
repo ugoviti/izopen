@@ -2,8 +2,8 @@
 # multi protocol bash script to auto opening given URI and auto creating ssh reverse tunnel socks proxy
 # very useful to use KeePassX as secure URI launcher
 # Written by Ugo Viti <ugo.viti@initzero.it>
-#    date: 20161117
-# version: 2.1
+#    date: 20170830
+# version: 2.2
 
 # features:
 #    URI handling of: ssh, rdp, vnc, sftp, ftp, http, https, smb and cifs protocols
@@ -72,7 +72,7 @@ helper_ssh() {
   helper_cmd_opts="$helper_cmd_opts -C $([ -n "$port" ] && echo "-p $port") $username@$host $opts"
 
   # set the final command
-  helper_cmd="$helper_cmd_terminal -e \"ssh $helper_cmd_opts\" --title \"$([ "$tunnel_create" = 1 ] && echo "$host Tunnel: $tunnel_port_create" || echo "$host")\""
+  helper_cmd="$helper_cmd_terminal -t \"$([ "$tunnel_create" = 1 ] && echo "H:$host P:$tunnel_port_create" || echo "H:$host")\" -e \"ssh $helper_cmd_opts\""
 
   ####################### 
   # test colorized prompt
@@ -93,7 +93,7 @@ helper_telnet() {
   helper_cmd_opts="$helper_cmd_opts $opts $host $([ -n "$port" ] && echo "-p $port")"
 
   # set the final command
-  helper_cmd="$helper_cmd_terminal -e \"telnet $helper_cmd_opts\" --title \"$([ "$tunnel_create" = 1 ] && echo "$host Tunnel: $tunnel_port_create" || echo "$host")\""
+  helper_cmd="$helper_cmd_terminal -t \"$([ "$tunnel_create" = 1 ] && echo "H:$host P:$tunnel_port_create" || echo "H:$host")\" -e \"telnet $helper_cmd_opts\""
 
   ####################### 
   # test colorized prompt
@@ -109,7 +109,7 @@ helper_rdp() {
   # extract domain from username and convert to the right name
   domain="$(echo "$username" | awk -F"/" '{print $1}')"
   username="$(echo "$username" | awk -F"/" '{print $2}')"
-  password="$(echo "$password" | sed 's/\%25/\%/g')" # % key workaround
+  password="$(echo "$password" | sed 's/\%25/\%/g' | sed 's/L%C4l4dm/L%c4l4dm/')" # % key workaround and password workaround
   [ -z "$username" ] && username=$domain && unset domain
   #username="$(echo "$username" | sed 's/\//\\\\/g')"
   case $helper_cmd_rdp in
@@ -117,7 +117,7 @@ helper_rdp() {
       helper_cmd="$helper_cmd_rdp -k it -g 1280x780 $opts $([ -n "$domain" ] && echo "-d \"$domain\"") $([ -n "$username" ] && echo "-u \"$username\"")  $([ -n "$password" ] && echo "-p \"$password\"") $host$([ -n "$port" ] && echo ":$port")"
       ;;
     xfreerdp)
-      helper_cmd="$helper_cmd_rdp +clipboard /kbd:Italian /size:95% /cert-tofu /cert-ignore $opts $([ -n "$domain" ] && echo "/d:\"$domain\"") $([ -n "$username" ] && echo "/u:'$username'")  $([ -n "$password" ] && echo "/p:'$password'") /v:"$host"$([ -n "$port" ] && echo ":$port")"
+      helper_cmd="$helper_cmd_rdp +drives +clipboard /kbd:Italian /size:95% /cert-tofu /cert-ignore $opts $([ -n "$domain" ] && echo "/d:\"$domain\"") $([ -n "$username" ] && echo "/u:$username")  $([ -n "$password" ] && echo "/p:$password") /v:"$host"$([ -n "$port" ] && echo ":$port")"
       ;;
   esac
 
@@ -141,7 +141,7 @@ helper_http() {
   if [ "$tunnel_use" = 1 ] 
     then
 	if [ $helper_http_chrome = 1 ] ; then
-	  helper_cmd="google-chrome --disable-gpu --restore-last-session --no-first-run --disable-translate --password-store=basic --user-data-dir=\"$izopen_tmp/google-chrome-$tunnel_port_use\" --proxy-server=\"socks5://localhost:$tunnel_port_use\" \"$args\""
+	  helper_cmd="google-chrome --disable-client-side-phishing-detection --disable-gpu --restore-last-session --no-first-run --disable-translate --password-store=basic --user-data-dir=\"$izopen_tmp/google-chrome-$tunnel_port_use\" --proxy-server=\"socks5://localhost:$tunnel_port_use\" \"$args\""
 	else
 	  helper_cmd="midori -c \"$izopen_tmp/midori-$tunnel_port_use\" \"$args\""
 	fi
@@ -246,7 +246,6 @@ helper_tunnel() {
 }
 
 print_debug() {
-  if [ $debug = 1 ]; then
 	# print the parsed fields
 	echo "========================================================================================"
 	echo "$(date +"%Y-%m-%d %H:%M:%S %Z") [debug]: $0 $args"
@@ -261,7 +260,6 @@ print_debug() {
 	echo "   uri tmp: $uritmp"
 	echo "helper cmd: $helper_cmd"
 	echo "========================================================================================"
-  fi | tee -a /tmp/izopen.log
 }
 
 open_uri() {
@@ -320,6 +318,7 @@ url_parse() {
             login="$(echo $url | grep @ | cut -d@ -f1)"
             username="$(echo $login | cut -d: -f1)"
             password="$(echo $login | grep : | cut -d: -f2)"
+	    password="$(echo "$password" | sed 's/!/\\!/g' | sed 's/'\''/\\'\''/g')"
 
             # extract the host
             hostport="$(echo ${url/$login@/} | cut -d/ -f1)"
