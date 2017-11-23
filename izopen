@@ -113,8 +113,8 @@ helper_rdp() {
     username="$(echo "$username" | awk -F"/" '{print $2}')"
   fi
 
-  #password="$(echo "$password" | sed 's/\%25/\%/g' | sed -e 's/%\([A-Z]\)/%\L\1/')" # % key workaround and password workaround of keepassxc bug
-  password="$(echo "$password" | sed -e 's/%\([A-Z]\)/%\L\1/')" # keepassxc bug workaround: after the '%' char, keepassxc convert to uppercase the following char
+  #password="$(echo "$password" | sed -e 's/%\([A-Z]\)/%\L\1/')" # keepassxc bug workaround: after the '%' char, keepassxc convert to uppercase the following char
+  password="$(echo "$password" | sed 's/\%25/\%/g' | sed -e 's/%\([A-Z]\)/%\L\1/')" # keepassxc bug workaround: after the '%' char, keepassxc convert to uppercase the following char
 
   #[ -z "$username" ] && username=$domain && unset domain
   #username="$(echo "$username" | sed 's/\//\\\\/g')"
@@ -284,7 +284,6 @@ open_uri() {
   ##
   case ${protocol} in
         ssh|telnet|rdp|vnc|sftp|ftp|http|https|about|smb|cifs)
-		[ $debug = 1 ] && print_debug
 		# create or use ssh tunnel if required
 		[[ "$tunnel_create" = 1 || "$tunnel_use" = 1 ]] && helper_tunnel "$args"
 		# obtain commands to use to connect
@@ -295,6 +294,9 @@ open_uri() {
 		else
 		  helper_cmd="$helper_cmd_prepend $helper_cmd"
 		fi
+
+		[ $debug = 1 ] && print_debug
+
 		# connect to remote server
 		eval "$helper_cmd"
 		;;
