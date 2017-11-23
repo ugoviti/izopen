@@ -2,8 +2,8 @@
 # multi protocol bash script to auto opening given URI and auto creating ssh reverse tunnel socks proxy
 # very useful to use KeePassX as secure URI launcher
 # Written by Ugo Viti <ugo.viti@initzero.it>
-#    date: 20170830
-# version: 2.2
+#    date: 20171123
+# version: 2.3
 
 # features:
 #    URI handling of: ssh, rdp, vnc, sftp, ftp, http, https, smb and cifs protocols
@@ -19,6 +19,7 @@
 #        izopen ssh://root:supersecurepassword@www.example.com
 #        izopen smb://Administrator:password@server
 #        izopen rdp://DOMAIN/Administrator:password@server
+#        izopen rdp:///Administrator:password@server
 
 # KeePassX 0.x integration:
 #        into advanded settings of keepassx select "Custom Browser Command" and insert:
@@ -106,12 +107,18 @@ helper_rdp() {
   #helper_cmd_rdp="rdesktop"
   helper_cmd_rdp="xfreerdp"
 
-  # extract domain from username and convert to the right name
-  domain="$(echo "$username" | awk -F"/" '{print $1}')"
-  username="$(echo "$username" | awk -F"/" '{print $2}')"
-  password="$(echo "$password" | sed 's/\%25/\%/g' | sed 's/L%C4l4dm/L%c4l4dm/')" # % key workaround and password workaround
-  [ -z "$username" ] && username=$domain && unset domain
+  # extract windows domain from username and convert to the right name
+  if [ ! -z $(echo "$username" | grep "/") ]; then
+    domain="$(echo "$username" | awk -F"/" '{print $1}')"
+    username="$(echo "$username" | awk -F"/" '{print $2}')"
+  fi
+
+  #password="$(echo "$password" | sed 's/\%25/\%/g' | sed -e 's/%\([A-Z]\)/%\L\1/')" # % key workaround and password workaround of keepassxc bug
+  password="$(echo "$password" | sed -e 's/%\([A-Z]\)/%\L\1/')" # keepassxc bug workaround: after the '%' char, keepassxc convert to uppercase the following char
+
+  #[ -z "$username" ] && username=$domain && unset domain
   #username="$(echo "$username" | sed 's/\//\\\\/g')"
+
   case $helper_cmd_rdp in
     rdesktop)
       helper_cmd="$helper_cmd_rdp -k it -g 1280x780 $opts $([ -n "$domain" ] && echo "-d \"$domain\"") $([ -n "$username" ] && echo "-u \"$username\"")  $([ -n "$password" ] && echo "-p \"$password\"") $host$([ -n "$port" ] && echo ":$port")"
@@ -267,7 +274,6 @@ open_uri() {
   local args="$@"
   shift
   local opts="$@"
-  #parse_uri "$(echo $uri | sed s/\*/\\\WILDCARD/g)"
   url_parse "$uri"
 
   # workarounds
@@ -278,6 +284,7 @@ open_uri() {
   ##
   case ${protocol} in
         ssh|telnet|rdp|vnc|sftp|ftp|http|https|about|smb|cifs)
+		[ $debug = 1 ] && print_debug
 		# create or use ssh tunnel if required
 		[[ "$tunnel_create" = 1 || "$tunnel_use" = 1 ]] && helper_tunnel "$args"
 		# obtain commands to use to connect
@@ -288,7 +295,6 @@ open_uri() {
 		else
 		  helper_cmd="$helper_cmd_prepend $helper_cmd"
 		fi
-		[ $debug = 1 ] && print_debug
 		# connect to remote server
 		eval "$helper_cmd"
 		;;
