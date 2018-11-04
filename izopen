@@ -2,8 +2,8 @@
 # multi protocol bash script to auto opening given URI and auto creating ssh reverse tunnel socks proxy
 # very useful to use KeePassX as secure URI launcher
 # Written by Ugo Viti <ugo.viti@initzero.it>
-#    date: 20171123
-# version: 2.3
+#    date: 20181104
+# version: 2.4
 
 # features:
 #    URI handling of: ssh, rdp, vnc, sftp, ftp, http, https, smb and cifs protocols
@@ -56,7 +56,9 @@ helper_ssh() {
   elif [ "$XDG_CURRENT_DESKTOP" = "GNOME" ]; then
     helper_cmd_terminal="$(gsettings get org.gnome.desktop.default-applications.terminal exec | tr -d \')"
   elif [ "$XDG_CURRENT_DESKTOP" = "KDE" ]; then
-    helper_cmd_terminal="$(kreadconfig --file kdeglobals --group General --key TerminalApplication| tr -d \')"
+    helper_cmd_terminal="$(kreadconfig --file kdeglobals --group General --key TerminalApplication | tr -d \')"
+  elif [ "$XDG_CURRENT_DESKTOP" = "XFCE" ]; then
+    helper_cmd_terminal="exo-open --launch TerminalEmulator"
    else
     helper_cmd_terminal="terminator"
   fi
@@ -73,12 +75,12 @@ helper_ssh() {
   helper_cmd_opts="$helper_cmd_opts -C $([ -n "$port" ] && echo "-p $port") $username@$host $opts"
 
   # set the final command
-  helper_cmd="$helper_cmd_terminal -t \"$([ "$tunnel_create" = 1 ] && echo "H:$host P:$tunnel_port_create" || echo "H:$host")\" -e \"ssh $helper_cmd_opts\""
+  helper_cmd="$helper_cmd_terminal --title \"$([ "$tunnel_create" = 1 ] && echo "H:$host P:$tunnel_port_create" || echo "H:$host")\" --command \"ssh $helper_cmd_opts\""
 
   ####################### 
   # test colorized prompt
-  #helper_cmd="gnome-terminal -e \"ssh $([ -n "$port" ] && echo "-p $port") $username@$host $opts\""
-  #helper_cmd_ssh_opts="-t \"export PS1='\e[0;31m[\u@\h \W]\$ \e[m '; exec bash\""
+  #helper_cmd="gnome-terminal --command \"ssh $([ -n "$port" ] && echo "-p $port") $username@$host $opts\""
+  #helper_cmd_ssh_opts="--title \"export PS1='\e[0;31m[\u@\h \W]\$ \e[m '; exec bash\""
 }
 
 helper_telnet() {
@@ -94,12 +96,12 @@ helper_telnet() {
   helper_cmd_opts="$helper_cmd_opts $opts $host $([ -n "$port" ] && echo "-p $port")"
 
   # set the final command
-  helper_cmd="$helper_cmd_terminal -t \"$([ "$tunnel_create" = 1 ] && echo "H:$host P:$tunnel_port_create" || echo "H:$host")\" -e \"telnet $helper_cmd_opts\""
+  helper_cmd="$helper_cmd_terminal --title \"$([ "$tunnel_create" = 1 ] && echo "H:$host P:$tunnel_port_create" || echo "H:$host")\" --command \"telnet $helper_cmd_opts\""
 
   ####################### 
   # test colorized prompt
-  #helper_cmd="gnome-terminal -e \"ssh $([ -n "$port" ] && echo "-p $port") $username@$host $opts\""
-  #helper_cmd_ssh_opts="-t \"export PS1='\e[0;31m[\u@\h \W]\$ \e[m '; exec bash\""
+  #helper_cmd="gnome-terminal --command \"ssh $([ -n "$port" ] && echo "-p $port") $username@$host $opts\""
+  #helper_cmd_ssh_opts="--title \"export PS1='\e[0;31m[\u@\h \W]\$ \e[m '; exec bash\""
 }
 
 
@@ -124,7 +126,7 @@ helper_rdp() {
       helper_cmd="$helper_cmd_rdp -k it -g 1280x780 $opts $([ -n "$domain" ] && echo "-d \"$domain\"") $([ -n "$username" ] && echo "-u \"$username\"")  $([ -n "$password" ] && echo "-p \"$password\"") $host$([ -n "$port" ] && echo ":$port")"
       ;;
     xfreerdp)
-      helper_cmd="$helper_cmd_rdp +drives +clipboard /kbd:Italian /size:95% /cert-tofu /cert-ignore $opts $([ -n "$domain" ] && echo "/d:\"$domain\"") $([ -n "$username" ] && echo "/u:$username")  $([ -n "$password" ] && echo "/p:$password") /v:"$host"$([ -n "$port" ] && echo ":$port")"
+      helper_cmd="$helper_cmd_rdp /drive:t,/tmp +clipboard /kbd:Italian /size:90% /cert-tofu /cert-ignore $opts $([ -n "$domain" ] && echo "/d:\"$domain\"") $([ -n "$username" ] && echo "/u:$username")  $([ -n "$password" ] && echo "/p:$password") /v:"$host"$([ -n "$port" ] && echo ":$port")"
       ;;
   esac
 
@@ -148,7 +150,7 @@ helper_http() {
   if [ "$tunnel_use" = 1 ] 
     then
 	if [ $helper_http_chrome = 1 ] ; then
-	  helper_cmd="google-chrome --disable-client-side-phishing-detection --disable-gpu --restore-last-session --no-first-run --disable-translate --password-store=basic --user-data-dir=\"$izopen_tmp/google-chrome-$tunnel_port_use\" --proxy-server=\"socks5://localhost:$tunnel_port_use\" \"$args\""
+	  helper_cmd="google-chrome --media-cache-size=1 --disk-cache-size=1 --disable-client-side-phishing-detection --disable-gpu --restore-last-session --no-first-run --disable-translate --password-store=basic --user-data-dir=\"$izopen_tmp/google-chrome-$tunnel_port_use\" --proxy-server=\"socks5://localhost:$tunnel_port_use\" \"$args\""
 	else
 	  helper_cmd="midori -c \"$izopen_tmp/midori-$tunnel_port_use\" \"$args\""
 	fi
