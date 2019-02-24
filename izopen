@@ -126,7 +126,7 @@ helper_rdp() {
       helper_cmd="$helper_cmd_rdp -k it -g 1280x780 $opts $([ -n "$domain" ] && echo "-d \"$domain\"") $([ -n "$username" ] && echo "-u \"$username\"")  $([ -n "$password" ] && echo "-p \"$password\"") $host$([ -n "$port" ] && echo ":$port")"
       ;;
     xfreerdp)
-      helper_cmd="$helper_cmd_rdp /drive:t,/tmp +clipboard /kbd:Italian /size:90% /cert-tofu /cert-ignore $opts $([ -n "$domain" ] && echo "/d:\"$domain\"") $([ -n "$username" ] && echo "/u:$username")  $([ -n "$password" ] && echo "/p:$password") /v:"$host"$([ -n "$port" ] && echo ":$port")"
+      helper_cmd="$helper_cmd_rdp /drive:t,/tmp +clipboard /kbd:Italian /size:85% /cert-tofu /cert-ignore $opts $([ -n "$domain" ] && echo "/d:\"$domain\"") $([ -n "$username" ] && echo "/u:$username")  $([ -n "$password" ] && echo "/p:$password") /v:"$host"$([ -n "$port" ] && echo ":$port")"
       ;;
   esac
 
@@ -150,7 +150,8 @@ helper_http() {
   if [ "$tunnel_use" = 1 ] 
     then
 	if [ $helper_http_chrome = 1 ] ; then
-	  helper_cmd="google-chrome --media-cache-size=1 --disk-cache-size=1 --disable-client-side-phishing-detection --disable-gpu --restore-last-session --no-first-run --disable-translate --password-store=basic --user-data-dir=\"$izopen_tmp/google-chrome-$tunnel_port_use\" --proxy-server=\"socks5://localhost:$tunnel_port_use\" \"$args\""
+	  #helper_cmd="google-chrome --media-cache-size=1 --disk-cache-size=1 --disable-client-side-phishing-detection --disable-gpu --restore-last-session --no-first-run --disable-translate --password-store=basic --user-data-dir=\"$izopen_tmp/google-chrome-$tunnel_port_use\" --proxy-server=\"socks5://localhost:$tunnel_port_use\" \"$args\""
+	  helper_cmd="google-chrome --aggressive-cache-discard --disable-notifications --enable-aggressive-domstorage-flushing --disable-client-side-phishing-detection --disable-gpu --restore-last-session --no-first-run --disable-translate --password-store=basic --user-data-dir=\"$izopen_tmp/google-chrome-$tunnel_port_use\" --proxy-server=\"socks5://localhost:$tunnel_port_use\" \"$args\""
 	else
 	  helper_cmd="midori -c \"$izopen_tmp/midori-$tunnel_port_use\" \"$args\""
 	fi
