@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 # multi protocol bash script to auto opening given URI and auto creating ssh reverse tunnel socks proxy
 # very useful to use KeePassX as secure URI launcher
 # Written by Ugo Viti <ugo.viti@initzero.it>
@@ -126,7 +126,7 @@ helper_rdp() {
       helper_cmd="$helper_cmd_rdp -k it -g 1280x780 $opts $([ -n "$domain" ] && echo "-d \"$domain\"") $([ -n "$username" ] && echo "-u \"$username\"")  $([ -n "$password" ] && echo "-p \"$password\"") $host$([ -n "$port" ] && echo ":$port")"
       ;;
     xfreerdp)
-      helper_cmd="$helper_cmd_rdp /drive:t,/tmp +clipboard /kbd:Italian /size:85% /cert-tofu /cert-ignore $opts $([ -n "$domain" ] && echo "/d:\"$domain\"") $([ -n "$username" ] && echo "/u:$username")  $([ -n "$password" ] && echo "/p:$password") /v:"$host"$([ -n "$port" ] && echo ":$port")"
+      helper_cmd="$helper_cmd_rdp /drive:t,/tmp /drive:z,$HOME/download +clipboard /kbd:Italian /size:85% /cert-tofu /cert-ignore $opts $([ -n "$domain" ] && echo "/d:\"$domain\"") $([ -n "$username" ] && echo "/u:$username")  $([ -n "$password" ] && echo "/p:$password") /v:"$host"$([ -n "$port" ] && echo ":$port")"
       ;;
   esac
 
@@ -219,7 +219,7 @@ helper_tunnel_create() {
 helper_tunnel() {
  tunnel_ports_all="$(cat $izopen_tmp_socks_all 2>/dev/null)"
  tunnel_ports_last="$(cat $izopen_tmp_socks_last 2>/dev/null)"
- [ -z "$tunnel_ports_all" ] && tunnel_ports_all=2999
+ [ -z "$tunnel_ports_all" ] && tunnel_ports_all=4999
  [ -z "$tunnel_ports_last" ] && tunnel_ports_last=$tunnel_ports_start
 
  # don't use tunnel if the protocol is ssh and is not forced
@@ -241,7 +241,7 @@ helper_tunnel() {
  #echo tunnel_port_use="$tunnel_port_use"
 
  # create the proxychains4 config
- if [[ ! -z $tunnel_port_use && $tunnel_port_use =~ ^-?[0-9]+$ && $tunnel_port_use -ge $tunnel_ports_start && $tunnel_port_use -le 2999 ]]
+ if [[ ! -z $tunnel_port_use && $tunnel_port_use =~ ^-?[0-9]+$ && $tunnel_port_use -ge $tunnel_ports_start && $tunnel_port_use -le 4999 ]]
   then
         # proxychains configuration
 	izopen_tmp_socks_proxy="$izopen_tmp/proxychains.$tunnel_port_use.conf"
