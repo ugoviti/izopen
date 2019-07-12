@@ -59,8 +59,11 @@ helper_ssh() {
     helper_cmd_terminal="$(kreadconfig --file kdeglobals --group General --key TerminalApplication | tr -d \')"
   elif [ "$XDG_CURRENT_DESKTOP" = "XFCE" ]; then
     helper_cmd_terminal="exo-open --launch TerminalEmulator"
+  elif [ "$XDG_CURRENT_DESKTOP" = "Pantheon" ]; then
+    #helper_cmd_terminal="io.elementary.terminal"
+    helper_cmd_terminal="exo-open --launch TerminalEmulator"
    else
-    helper_cmd_terminal="terminator"
+    helper_cmd_terminal="xterm"
   fi
 
   #helper_cmd_terminal="mate-terminal"
@@ -126,7 +129,7 @@ helper_rdp() {
       helper_cmd="$helper_cmd_rdp -k it -g 1280x780 $opts $([ -n "$domain" ] && echo "-d \"$domain\"") $([ -n "$username" ] && echo "-u \"$username\"")  $([ -n "$password" ] && echo "-p \"$password\"") $host$([ -n "$port" ] && echo ":$port")"
       ;;
     xfreerdp)
-      helper_cmd="$helper_cmd_rdp /drive:t,/tmp /drive:z,$HOME/download +clipboard /kbd:Italian /size:85% /cert-tofu /cert-ignore $opts $([ -n "$domain" ] && echo "/d:\"$domain\"") $([ -n "$username" ] && echo "/u:$username")  $([ -n "$password" ] && echo "/p:$password") /v:"$host"$([ -n "$port" ] && echo ":$port")"
+      helper_cmd="$helper_cmd_rdp /drive:t,/tmp /drive:z,$HOME/Scaricati +clipboard /kbd:Italian /size:85% /cert-tofu /cert-ignore $opts $([ -n "$domain" ] && echo "/d:\"$domain\"") $([ -n "$username" ] && echo "/u:$username")  $([ -n "$password" ] && echo "/p:$password") /v:"$host"$([ -n "$port" ] && echo ":$port")"
       ;;
   esac
 
@@ -134,7 +137,8 @@ helper_rdp() {
 
 helper_vnc() {
   # vnc doesn't support username and actually don't accept the password. use the gnome keyring instead for this
-  helper_cmd="vinagre $protocol://$host$([ -n $port ] && echo ":$port")"
+  #helper_cmd="vinagre $protocol://$host$([ -n $port ] && echo ":$port")"
+  helper_cmd="vncviewer $host$([ -n $port ] && echo ":$port")"
 }
 
 helper_sftp() {
