@@ -6,12 +6,12 @@
 # version: 2.4
 
 # features:
-#    URI handling of: ssh, rdp, vnc, sftp, ftp, http, https, smb and cifs protocols
+#    URI handling of: ssh, rdp, vnc, sftp, ftp, http, https, smb and cifs schemas
 
 # installation:
 #        simply copy this script into a user or system wide bin directory (suggestion: cp izopen ~/bin), must be into a PATH variable
 
-# usage: izopen uri://username:password@hostname:port
+# usage: izopen uri://username:password@address:port
 
 # examples:
 #        izopen http://www.example.com
@@ -24,11 +24,11 @@
 # KeePassX 0.x integration:
 #        into advanded settings of keepassx select "Custom Browser Command" and insert:
 #        izopen %1
-#        for every account stored into your database, write into URL field: uri://{USERNAME}:{PASSWORD}@host:port
+#        for every account stored into your database, write into URL field: uri://{USERNAME}:{PASSWORD}@address:port
 #        example: rdp://{USERNAME}:{PASSWORD}@www.example.com:3389
 
 # KeePassX 2.x integration (Fedora >= 23):
-#        dnf install -y zenity kdelibs3 proxychains-ng keepassx
+#        dnf install -y yad kdelibs3 proxychains-ng keepassx
 
 
 # variables
@@ -56,11 +56,12 @@ helper_ssh() {
   elif [ "$XDG_CURRENT_DESKTOP" = "GNOME" ]; then
     helper_cmd_terminal="$(gsettings get org.gnome.desktop.default-applications.terminal exec | tr -d \')"
   elif [ "$XDG_CURRENT_DESKTOP" = "KDE" ]; then
-    helper_cmd_terminal="$(kreadconfig --file kdeglobals --group General --key TerminalApplication | tr -d \')"
+    #helper_cmd_terminal="$(kreadconfig --file kdeglobals --group General --key TerminalApplication | tr -d \')"
+    helper_cmd_terminal="konsole"
   elif [ "$XDG_CURRENT_DESKTOP" = "XFCE" ]; then
     helper_cmd_terminal="exo-open --launch TerminalEmulator"
   elif [ "$XDG_CURRENT_DESKTOP" = "Pantheon" ]; then
-    #helper_cmd_terminal="io.elementary.terminal"
+    #C3d4dm1n24!helper_cmd_terminal="io.elementary.terminal"
     helper_cmd_terminal="exo-open --launch TerminalEmulator"
    else
     helper_cmd_terminal="xterm"
@@ -75,14 +76,14 @@ helper_ssh() {
   [ -z "$username" ] && read -p "username: " username;
   #[ -z "$password" ] && read -p "password: " password;
   
-  helper_cmd_opts="$helper_cmd_opts -C $([ -n "$port" ] && echo "-p $port") $username@$host $opts"
+  helper_cmd_opts="$helper_cmd_opts -C $([ -n "$port" ] && echo "-p $port") $username@$address $opts"
 
   # set the final command
-  helper_cmd="$helper_cmd_terminal --title \"$([ "$tunnel_create" = 1 ] && echo "H:$host P:$tunnel_port_create" || echo "H:$host")\" --command \"ssh $helper_cmd_opts\""
+  helper_cmd="$helper_cmd_terminal --title \"$([ "$tunnel_create" = 1 ] && echo "H:$address P:$tunnel_port_create" || echo "H:$address")\" -e \"ssh $helper_cmd_opts\""
 
   ####################### 
   # test colorized prompt
-  #helper_cmd="gnome-terminal --command \"ssh $([ -n "$port" ] && echo "-p $port") $username@$host $opts\""
+  #helper_cmd="gnome-terminal -e \"ssh $([ -n "$port" ] && echo "-p $port") $username@$address $opts\""
   #helper_cmd_ssh_opts="--title \"export PS1='\e[0;31m[\u@\h \W]\$ \e[m '; exec bash\""
 }
 
@@ -96,14 +97,14 @@ helper_telnet() {
   [ -z "$username" ] && read -p "username: " username;
   #[ -z "$password" ] && read -p "password: " password;
   
-  helper_cmd_opts="$helper_cmd_opts $opts $host $([ -n "$port" ] && echo "-p $port")"
+  helper_cmd_opts="$helper_cmd_opts $opts $address $([ -n "$port" ] && echo "-p $port")"
 
   # set the final command
-  helper_cmd="$helper_cmd_terminal --title \"$([ "$tunnel_create" = 1 ] && echo "H:$host P:$tunnel_port_create" || echo "H:$host")\" --command \"telnet $helper_cmd_opts\""
+  helper_cmd="$helper_cmd_terminal --title \"$([ "$tunnel_create" = 1 ] && echo "H:$address P:$tunnel_port_create" || echo "H:$address")\" -e \"telnet $helper_cmd_opts\""
 
   ####################### 
   # test colorized prompt
-  #helper_cmd="gnome-terminal --command \"ssh $([ -n "$port" ] && echo "-p $port") $username@$host $opts\""
+  #helper_cmd="gnome-terminal -e \"ssh $([ -n "$port" ] && echo "-p $port") $username@$address $opts\""
   #helper_cmd_ssh_opts="--title \"export PS1='\e[0;31m[\u@\h \W]\$ \e[m '; exec bash\""
 }
 
@@ -113,23 +114,38 @@ helper_rdp() {
   helper_cmd_rdp="xfreerdp"
 
   # extract windows domain from username and convert to the right name
+  if [ ! -z $(echo "$username" | grep "@") ]; then
+    domain="$(echo "$username" | awk -F"@" '{print $2}')"
+    username="$(echo "$username" | awk -F"@" '{print $1}')"
+  fi
+
   if [ ! -z $(echo "$username" | grep "/") ]; then
     domain="$(echo "$username" | awk -F"/" '{print $1}')"
     username="$(echo "$username" | awk -F"/" '{print $2}')"
   fi
 
+  # FIXME
   #password="$(echo "$password" | sed -e 's/%\([A-Z]\)/%\L\1/')" # keepassxc bug workaround: after the '%' char, keepassxc convert to uppercase the following char
   password="$(echo "$password" | sed 's/\%25/\%/g' | sed -e 's/%\([A-Z]\)/%\L\1/')" # keepassxc bug workaround: after the '%' char, keepassxc convert to uppercase the following char
 
   #[ -z "$username" ] && username=$domain && unset domain
   #username="$(echo "$username" | sed 's/\//\\\\/g')"
 
+  if [[ -z "$address" || -z "$username" || -z "$password" || "$username" = "{USERNAME}" || "$password" = "{PASSWORD}" || "$username" = "%7BUSERNAME%7D" || "$password" = "%7BPASSWORD%7D" ]]; then
+  frmdata=$(yad --title "Connect to remote computer" --align=right --form --field="Domain" --field="Address" --field="Username" --field="Password:H" "$domain" "$address" "$username" "$password")
+  [ $? != 0 ] && exit 1
+  domain=$(echo $frmdata | awk 'BEGIN {FS="|" } { print $1 }')
+  address=$(echo $frmdata | awk 'BEGIN {FS="|" } { print $2 }')
+  username=$(echo $frmdata | awk 'BEGIN {FS="|" } { print $3 }')
+  password=$(echo $frmdata | awk 'BEGIN {FS="|" } { print $4 }')
+  fi
+
   case $helper_cmd_rdp in
     rdesktop)
-      helper_cmd="$helper_cmd_rdp -k it -g 1280x780 $opts $([ -n "$domain" ] && echo "-d \"$domain\"") $([ -n "$username" ] && echo "-u \"$username\"")  $([ -n "$password" ] && echo "-p \"$password\"") $host$([ -n "$port" ] && echo ":$port")"
+      helper_cmd="$helper_cmd_rdp -k it -g 1280x780 $opts $([ -n "$domain" ] && echo "-d \"$domain\"") $([ -n "$username" ] && echo "-u \"$username\"")  $([ -n "$password" ] && echo "-p \"$password\"") $address$([ -n "$port" ] && echo ":$port")"
       ;;
     xfreerdp)
-      helper_cmd="$helper_cmd_rdp /drive:t,/tmp /drive:z,$HOME/Scaricati +clipboard /kbd:Italian /size:85% /cert-tofu /cert-ignore $opts $([ -n "$domain" ] && echo "/d:\"$domain\"") $([ -n "$username" ] && echo "/u:$username")  $([ -n "$password" ] && echo "/p:$password") /v:"$host"$([ -n "$port" ] && echo ":$port")"
+      helper_cmd="$helper_cmd_rdp /drive:t,/tmp /drive:z,$HOME/Scaricati +clipboard /kbd:Italian /size:85% /cert-tofu /cert-ignore $opts $([ -n "$domain" ] && echo "/d:\"$domain\"") $([ -n "$username" ] && echo "/u:$username")  $([ -n "$password" ] && echo "/p:$password") /v:"$address"$([ -n "$port" ] && echo ":$port")"
       ;;
   esac
 
@@ -137,8 +153,8 @@ helper_rdp() {
 
 helper_vnc() {
   # vnc doesn't support username and actually don't accept the password. use the gnome keyring instead for this
-  #helper_cmd="vinagre $protocol://$host$([ -n $port ] && echo ":$port")"
-  helper_cmd="vncviewer $host$([ -n $port ] && echo ":$port")"
+  #helper_cmd="vinagre $schema://$address$([ -n $port ] && echo ":$port")"
+  helper_cmd="vncviewer $address$([ -n $port ] && echo ":$port")"
 }
 
 helper_sftp() {
@@ -186,13 +202,13 @@ helper_cifs() {
 #########################################################################
 
 helper_tunnel_create() {
- # put specific host port forwarding port config file
- izopen_tmp_socks_host="$izopen_tmp/socks_host_$(echo $host | sed -e 's/[^A-Za-z0-9_-]/_/g').conf"
+ # put specific address port forwarding port config file
+ izopen_tmp_socks_address="$izopen_tmp/socks_host_$(echo $address | sed -e 's/[^A-Za-z0-9_-]/_/g').conf"
 
  # don't create a new tunnel if it's already opened
- if [ -f "$izopen_tmp_socks_host" ]
+ if [ -f "$izopen_tmp_socks_address" ]
   then
-	nc 127.0.0.1 $(cat "$izopen_tmp_socks_host") </dev/null 2>/dev/null
+	nc 127.0.0.1 $(cat "$izopen_tmp_socks_address") </dev/null 2>/dev/null
 	[ $? != 0 ] && tunnel_create=1 || tunnel_create=0
  fi
  if [ "$tunnel_create" = 1 ]
@@ -201,15 +217,15 @@ helper_tunnel_create() {
 		mkdir -p "$izopen_tmp"
 		tunnel_port_create=$tunnel_ports_start
 		echo $tunnel_port_create > "$izopen_tmp_socks_all"
-	  elif [ -e "$izopen_tmp_socks_host" ] ; then 
-		tunnel_port_create="$(cat "$izopen_tmp_socks_host")"
+	  elif [ -e "$izopen_tmp_socks_address" ] ; then 
+		tunnel_port_create="$(cat "$izopen_tmp_socks_address")"
 	  elif [ -e "$izopen_tmp_socks_all" ] ; then
 		let tunnel_port_create="$(cat "$izopen_tmp_socks_all")+1"
 		echo $tunnel_port_create > "$izopen_tmp_socks_all"
 	  fi
 
-	  # save the current host used port
-	  echo $tunnel_port_create > "$izopen_tmp_socks_host"
+	  # save the current address used port
+	  echo $tunnel_port_create > "$izopen_tmp_socks_address"
 
 	  # save the last used/reused port
 	  echo $tunnel_port_create > "$izopen_tmp_socks_last"
@@ -226,15 +242,16 @@ helper_tunnel() {
  [ -z "$tunnel_ports_all" ] && tunnel_ports_all=4999
  [ -z "$tunnel_ports_last" ] && tunnel_ports_last=$tunnel_ports_start
 
- # don't use tunnel if the protocol is ssh and is not forced
- [[ "$protocol" = "ssh" && "$tunnel_use_force_ssh" = 0 ]] && tunnel_use=0
+ # don't use tunnel if the schema is ssh and is not forced
+ [[ "$schema" = "ssh" && "$tunnel_use_force_ssh" = 0 ]] && tunnel_use=0
 
  # create the ssh tunnel if the url is ssh://
- [ "$protocol" = "ssh" ] && helper_tunnel_create
+ [ "$schema" = "ssh" ] && helper_tunnel_create
 
  # ask for a port if we want use a tunnel
  if [ $tunnel_use = 1 ] ; then
-   tunnel_port_use=$(zenity --entry --entry-text=$tunnel_ports_last --text="Inserire la porta del Proxy Socks\nCompresa fra $tunnel_ports_start e $tunnel_ports_all\n" 2>/dev/null)
+   #tunnel_port_use=$(yad --title "izOpen SSH Proxy" --entry --entry-text=$tunnel_ports_last --text="Inserire la porta del Proxy Socks \nCompresa fra $tunnel_ports_start e $tunnel_ports_all\n" 2>/dev/null)
+   tunnel_port_use=$(yad --title "izOpen SSH Proxy" --entry --numeric --entry-text=$tunnel_ports_last --text="<b>Inserire la porta del Proxy Socks</b> \nCompresa fra $tunnel_ports_start e $tunnel_ports_all\n" $tunnel_ports_start $tunnel_ports_all --timeout=10 --timeout-indicator=bottom)
    # save the last used/reused port
    [ ! -z "$tunnel_port_use" ] && echo $tunnel_port_use > "$izopen_tmp_socks_last"
  fi
@@ -252,7 +269,7 @@ helper_tunnel() {
         echo -e "strict_chain\nquiet_mode\nproxy_dns\n[ProxyList]\nsocks5  127.0.0.1 $tunnel_port_use" > "$izopen_tmp_socks_proxy"
         helper_cmd_prepend="proxychains4 -f $izopen_tmp_socks_proxy"
   else
-    [ ! -z $tunnel_port_use ] && zenity --error --text="La porta specificata non è valida: $tunnel_port_use\n\nInserire una porta compresa fra $tunnel_ports_start e $tunnel_ports_all" 2>/dev/null && unset tunnel_port_use
+    [ ! -z $tunnel_port_use ] && yad --error --text="La porta specificata non è valida: $tunnel_port_use\n\nInserire una porta compresa fra $tunnel_ports_start e $tunnel_ports_all" 2>/dev/null && unset tunnel_port_use
  fi
 
  # don't use tunnel socks proxy if the port is not specified or wrong
@@ -265,10 +282,10 @@ print_debug() {
 	echo "$(date +"%Y-%m-%d %H:%M:%S %Z") [debug]: $0 $args"
 	echo "----------------------------------------------------------------------------------------"
 	echo "       uri: $uri"
-	echo "  protocol: $protocol"
+	echo "    schema: $schema"
 	echo "  username: $username"
 	echo "  password: $password"
-	echo "      host: $host"
+	echo "   address: $address"
 	echo "      port: $port"
 	echo "      path: $path"
 	echo "   uri tmp: $uritmp"
@@ -281,22 +298,22 @@ open_uri() {
   local args="$@"
   shift
   local opts="$@"
-  url_parse "$uri"
+  uri_parser "$uri"
 
   # workarounds
-  [ "${protocol}" = "sftp" ] && protocol="ssh" # force ssh with sftp url
+  [ "${schema}" = "sftp" ] && schema="ssh" # force ssh with sftp url
 
   ##
   ## customize the following uri for command associations:
   ##
-  case ${protocol} in
-        ssh|telnet|rdp|vnc|sftp|ftp|http|https|about|smb|cifs)
+  case ${schema} in
+        ssh|telnet|rdp|vnc|sftp|ftp|http|https|about|smb|cifs|file)
 		# create or use ssh tunnel if required
 		[[ "$tunnel_create" = 1 || "$tunnel_use" = 1 ]] && helper_tunnel "$args"
 		# obtain commands to use to connect
-		helper_${protocol} "$args"
+		helper_${schema} "$args"
 		# because google chrome doesn't works with proxychains, I don't use it
-		if [[ "$protocol" = "http" && $helper_http_chrome = 1 ]]; then
+		if [[ "$schema" = "http" && $helper_http_chrome = 1 ]]; then
 		  helper_cmd="$helper_cmd"
 		else
 		  helper_cmd="$helper_cmd_prepend $helper_cmd"
@@ -314,20 +331,90 @@ open_uri() {
 }
 
 
+#
+# URI parsing function
+#
+# The function creates global variables with the parsed results.
+# It returns 0 if parsing was successful or non-zero otherwise.
+#
+# [schema://][user[:password]@]address[:port][/path][?[arg1=val1]...][#fragment]
+#
+# from http://vpalos.com/537/uri-parsing-using-bash-built-in-features/
+#
+function uri_parser2() {
+    # uri capture
+    uri="$@"
+
+    # safe escaping
+    uri="${uri//\`/%60}"
+    uri="${uri//\"/%22}"
+
+    # top level parsing
+    pattern='^(([a-z]{3,5})://)?((([^:\/]+)(:([^@\/]*))?@)?([^:\/?]*)(:([0-9]+))?)(\/[^?]*)?(\?[^#]*)?(#.*)?$'
+    [[ "$uri" =~ $pattern ]] || return 1;
+
+    # component extraction
+    uri=${BASH_REMATCH[0]}
+    schema=${BASH_REMATCH[2]}
+    address=${BASH_REMATCH[3]}
+    username=${BASH_REMATCH[5]}
+    password=${BASH_REMATCH[7]}
+    address=${BASH_REMATCH[8]}
+    port=${BASH_REMATCH[10]}
+    path=${BASH_REMATCH[11]}
+    query=${BASH_REMATCH[12]}
+    fragment=${BASH_REMATCH[13]}
+
+    # path parsing
+    count=0
+    path="$uri_path"
+    pattern='^/+([^/]+)'
+    while [[ $path =~ $pattern ]]; do
+        eval "uri_parts[$count]=\"${BASH_REMATCH[1]}\""
+        path="${path:${#BASH_REMATCH[0]}}"
+        let count++
+    done
+
+    # query parsing
+    count=0
+    query="$uri_query"
+    pattern='^[?&]+([^= ]+)(=([^&]*))?'
+    while [[ $query =~ $pattern ]]; do
+        eval "uri_args[$count]=\"${BASH_REMATCH[1]}\""
+        eval "uri_arg_${BASH_REMATCH[1]}=\"${BASH_REMATCH[3]}\""
+        query="${query:${#BASH_REMATCH[0]}}"
+        let count++
+    done
+
+    # return success
+    return 0
+}
+
+
 #      desc: set/check/sanitize/validate a URI and the gained variables
 #      args: $1
 # args desc: 'URI'
 #    return: misc variables containing the URI data
-url_parse() {
+uri_parser() {
+    # uri capture
+    uri="$@"
+
+    # safe escaping
+    uri="${uri//\`/%60}"
+    uri="${uri//\"/%22}"
+
     local query1 query2 path1 path2
 
-    # extract the protocolcol
-    protourl="$(echo $1 | grep :// | sed -e's,^\(.*://\).*,\1,g')"
-    protocol="$(echo $protourl | cut -d":" -f1 )"
+    # extract the schema
+    protourl="$(echo $uri | grep :// | sed -e's,^\(.*://\).*,\1,g')"
+    schema="$(echo $protourl | cut -d":" -f1 )"
 
-    if [[ ! -z $protocol ]] ; then
-            # remove the protocol
+    if [[ ! -z $schema ]] ; then
+            # remove the schema
             url="$(echo ${1/$protourl/})"
+
+            # since kde plasma 5.16 there is a bug when specifing extra port that add ?line=PORT&column=0
+            url="$(echo $url | sed 's/?line=/:/' | sed 's/&column=0//')"
 
             # extract the user (if any)
             login="$(echo $url | grep @ | cut -d@ -f1)"
@@ -335,12 +422,12 @@ url_parse() {
             password="$(echo $login | grep : | cut -d: -f2)"
 	    password="$(echo "$password" | sed 's/!/\\!/g' | sed 's/'\''/\\'\''/g')"
 
-            # extract the host
-            hostport="$(echo ${url/$login@/} | cut -d/ -f1)"
-            host="$(echo ${hostport} | cut -d: -f1)"
+            # extract the address
+            port="$(echo ${url/"$login"@/} | cut -d/ -f1)"
+            address="$(echo ${port} | cut -d: -f1)"
 
             # by request - try to extract the port
-            port="$(echo $hostport | grep ":" | sed -e 's,^.*:,:,g' -e 's,.*:\([0-9]*\).*,\1,g' -e 's,[^0-9],,g')"
+            port="$(echo $port | grep ":" | sed -e 's,^.*:,:,g' -e 's,.*:\([0-9]*\).*,\1,g' -e 's,[^0-9],,g')"
 
             # extract the uri (if any)
             resource="/$(echo $url | grep / | cut -d/ -f2-)"
@@ -349,8 +436,7 @@ url_parse() {
             login=""
             username=""
             password=""
-            host=""
-            hostname=""
+            address=""
             port=""
             resource=$1
     fi
@@ -375,11 +461,11 @@ url_parse() {
 
     if [ $debug = 2 ]; then
      echo "url: $url"
-     echo "protocol: $protocol"
+     echo "  schema: $schema"
      echo "   login: $login"
      echo "username: $username"
      echo "password: $password"
-     echo "    host: $host"
+     echo " address: $address"
      echo "    port: $port"
      echo "resource: $resource"
      echo "    path: $path"
