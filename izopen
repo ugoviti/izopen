@@ -148,7 +148,6 @@ helper_rdp() {
       helper_cmd="$helper_cmd_rdp /drive:t,/tmp /drive:z,$HOME/Scaricati +clipboard /kbd:Italian /size:85% /cert-tofu /cert-ignore $opts $([ -n "$domain" ] && echo "/d:\"$domain\"") $([ -n "$username" ] && echo "/u:$username")  $([ -n "$password" ] && echo "/p:$password") /v:"$address"$([ -n "$port" ] && echo ":$port")"
       ;;
   esac
-
 }
 
 helper_vnc() {
@@ -323,6 +322,7 @@ open_uri() {
 
 		# connect to remote server
 		eval "$helper_cmd"
+                [ $? != 0 ] && tail -n 20 /tmp/izopen.log | yad --width=800 --height=400 --title "Connection Error" --button=gtk-close:0 --text "Last 20 rows of file /tmp/izopen.log" --text-info
 		;;
         *)
 		echo "ERROR: invalid URI specified: $args"
