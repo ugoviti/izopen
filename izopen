@@ -1,9 +1,9 @@
 #!/bin/bash
 # multi protocol bash script to auto opening given URI and auto creating ssh reverse tunnel socks proxy
-# very useful to use KeePassX as secure URI launcher
+# very useful to use with KeePassX or any Desktop/Browser Password Manager as secure URI launcher
 # Written by Ugo Viti <ugo.viti@initzero.it>
-#    date: 20181104
-# version: 2.4
+#    date: 20200108
+# version: 2.5
 
 # features:
 #    URI handling of: ssh, rdp, vnc, sftp, ftp, http, https, smb and cifs schemas
@@ -41,16 +41,20 @@ tunnel_create_force=1		# always create the tunnel for every new ssh connection
 tunnel_use_force=1		# always use the tunnel for every opened url
 tunnel_use_force_ssh=0		# always use the tunnel if connecting via ssh
 
-izopen_tmp="$HOME/.config/izopen"
-izopen_tmp_socks_all="$izopen_tmp/socks_all.conf"
-izopen_tmp_socks_last="$izopen_tmp/socks_last.conf"
-tunnel_ports_start=2000
+izopen_tmp_dir="$HOME/.config/izopen"
+izopen_tmp_socks_port_last="$izopen_tmp_dir/socks_port_last.conf"
+izopen_tmp_socks_port_current="$izopen_tmp_dir/socks_port_current.conf"
+tunnel_port_min=2000
+tunnel_port_max=4999
+[ -e "$izopen_tmp_socks_port_current" ] && tunnel_port_last="$(cat $izopen_tmp_socks_port_current)"
 
+# import configuration from izopen.conf if exist
 [ -f "/tmp/izopen.conf" ] && . /tmp/izopen.conf
 
 # commands helper functions
 #########################################################################
 helper_ssh() {
+  # define the command to use based on current desktop environment
   if   [ "$XDG_CURRENT_DESKTOP" = "MATE" ]; then
     helper_cmd_terminal="$(gsettings get org.mate.applications-terminal exec | tr -d \')"
   elif [ "$XDG_CURRENT_DESKTOP" = "GNOME" ]; then
@@ -67,23 +71,19 @@ helper_ssh() {
     helper_cmd_terminal="xterm"
   fi
 
-  #helper_cmd_terminal="mate-terminal"
-  #helper_cmd_terminal="terminator"
-  #helper_cmd_terminal="gnome-terminal"
-  #helper_cmd_terminal="konsole"
-  #helper_cmd_terminal="xfce4-terminal"
-
   [ -z "$username" ] && read -p "username: " username;
   #[ -z "$password" ] && read -p "password: " password;
   
-  helper_cmd_opts="$helper_cmd_opts -C $([ -n "$port" ] && echo "-p $port") $username@$address $opts"
+  [ -n "$port" ] && helper_cmd_opts+="-p $port "
+
+  helper_cmd_opts+="-C $username@$address"
 
   # set the final command
   helper_cmd="$helper_cmd_terminal --title \"$([ "$tunnel_create" = 1 ] && echo "H:$address P:$tunnel_port_create" || echo "H:$address")\" -e \"ssh $helper_cmd_opts\""
 
   ####################### 
   # test colorized prompt
-  #helper_cmd="gnome-terminal -e \"ssh $([ -n "$port" ] && echo "-p $port") $username@$address $opts\""
+  #helper_cmd="gnome-terminal -e \"ssh $([ -n "$port" ] && echo "-p $port") $username@$address $helper_cmd_opts\""
   #helper_cmd_ssh_opts="--title \"export PS1='\e[0;31m[\u@\h \W]\$ \e[m '; exec bash\""
 }
 
@@ -97,14 +97,14 @@ helper_telnet() {
   [ -z "$username" ] && read -p "username: " username;
   #[ -z "$password" ] && read -p "password: " password;
   
-  helper_cmd_opts="$helper_cmd_opts $opts $address $([ -n "$port" ] && echo "-p $port")"
+  helper_cmd_opts+=" $address$([ -n "$prt" ] && echo " $port")"
 
   # set the final command
   helper_cmd="$helper_cmd_terminal --title \"$([ "$tunnel_create" = 1 ] && echo "H:$address P:$tunnel_port_create" || echo "H:$address")\" -e \"telnet $helper_cmd_opts\""
 
   ####################### 
   # test colorized prompt
-  #helper_cmd="gnome-terminal -e \"ssh $([ -n "$port" ] && echo "-p $port") $username@$address $opts\""
+  #helper_cmd="gnome-terminal -e \"ssh $([ -n "$port" ] && echo "-p $port") $username@$address\""
   #helper_cmd_ssh_opts="--title \"export PS1='\e[0;31m[\u@\h \W]\$ \e[m '; exec bash\""
 }
 
@@ -132,20 +132,28 @@ helper_rdp() {
   #username="$(echo "$username" | sed 's/\//\\\\/g')"
 
   if [[ -z "$address" || -z "$username" || -z "$password" || "$username" = "{USERNAME}" || "$password" = "{PASSWORD}" || "$username" = "%7BUSERNAME%7D" || "$password" = "%7BPASSWORD%7D" ]]; then
-  frmdata=$(yad --title "Connect to remote computer" --focus-field=4 --align=right --form --field="Domain" --field="Address" --field="Username" --field="Password:H" "$domain" "$address" "$username" "$password")
+  frmdata=$(yad --center --title "Connect to remote computer" --focus-field=4 --align=right --form --field="Domain" "$domain" --field="Address" "$address" --field="Username" "$username" --field="Password:H" "$password" --field="TLS:CHK" "$tls")
   [ $? != 0 ] && exit 1
   domain=$(echo $frmdata | awk 'BEGIN {FS="|" } { print $1 }')
   address=$(echo $frmdata | awk 'BEGIN {FS="|" } { print $2 }')
   username=$(echo $frmdata | awk 'BEGIN {FS="|" } { print $3 }')
   password=$(echo $frmdata | awk 'BEGIN {FS="|" } { print $4 }')
+  tls=$(echo $frmdata | awk 'BEGIN {FS="|" } { print $5 }')
   fi
 
   case $helper_cmd_rdp in
     rdesktop)
-      helper_cmd="$helper_cmd_rdp -k it -g 1280x780 $opts $([ -n "$domain" ] && echo "-d \"$domain\"") $([ -n "$username" ] && echo "-u \"$username\"")  $([ -n "$password" ] && echo "-p \"$password\"") $address$([ -n "$port" ] && echo ":$port")"
+      helper_cmd="$helper_cmd_rdp -k it -g 1280x780 $([ -n "$domain" ] && echo "-d \"$domain\"") $([ -n "$username" ] && echo "-u \"$username\"")  $([ -n "$password" ] && echo "-p \"$password\"") $address$([ -n "$port" ] && echo ":$port")"
       ;;
     xfreerdp)
-      helper_cmd="$helper_cmd_rdp /drive:t,/tmp /drive:z,$HOME/Scaricati +clipboard /kbd:Italian /size:85% /cert-tofu /cert-ignore $opts $([ -n "$domain" ] && echo "/d:\"$domain\"") $([ -n "$username" ] && echo "/u:$username")  $([ -n "$password" ] && echo "/p:$password") /v:"$address"$([ -n "$port" ] && echo ":$port")"
+      helper_cmd_opts+="/drive:r,/ramdisk +clipboard /kbd:Italian /size:85% /cert-tofu /cert-ignore /log-level:ERROR"
+      [ "$tls" = "TRUE" ] && helper_cmd_opts+=" /sec:tls"
+      [ ! -z "$domain" ] && helper_cmd_opts+=" /d:$domain"
+      [ ! -z "$username" ] && helper_cmd_opts+=" /u:$username"
+      [ ! -z "$password" ] && helper_cmd_opts+=" /p:\"$password\""
+      [ ! -z "$port" ] && helper_cmd_opts+=" /port:$port"
+
+      helper_cmd="$helper_cmd_rdp "$helper_cmd_opts" /v:$address"
       ;;
   esac
 }
@@ -169,10 +177,10 @@ helper_http() {
   if [ "$tunnel_use" = 1 ] 
     then
 	if [ $helper_http_chrome = 1 ] ; then
-	  #helper_cmd="google-chrome --media-cache-size=1 --disk-cache-size=1 --disable-client-side-phishing-detection --disable-gpu --restore-last-session --no-first-run --disable-translate --password-store=basic --user-data-dir=\"$izopen_tmp/google-chrome-$tunnel_port_use\" --proxy-server=\"socks5://localhost:$tunnel_port_use\" \"$args\""
-	  helper_cmd="google-chrome --aggressive-cache-discard --disable-notifications --enable-aggressive-domstorage-flushing --disable-client-side-phishing-detection --disable-gpu --restore-last-session --no-first-run --disable-translate --password-store=basic --user-data-dir=\"$izopen_tmp/google-chrome-$tunnel_port_use\" --proxy-server=\"socks5://localhost:$tunnel_port_use\" \"$args\""
+	  #helper_cmd="google-chrome --media-cache-size=1 --disk-cache-size=1 --disable-client-side-phishing-detection --disable-gpu --restore-last-session --no-first-run --disable-translate --password-store=basic --user-data-dir=\"$izopen_tmp_dir/google-chrome-$tunnel_port_current\" --proxy-server=\"socks5://localhost:$tunnel_port_current\" \"$args\""
+	  helper_cmd="google-chrome --aggressive-cache-discard --disable-notifications --enable-aggressive-domstorage-flushing --disable-client-side-phishing-detection --disable-gpu --restore-last-session --no-first-run --disable-translate --password-store=basic --user-data-dir=\"$izopen_tmp_dir/google-chrome-$tunnel_port_current\" --proxy-server=\"socks5://localhost:$tunnel_port_current\" \"$args\""
 	else
-	  helper_cmd="midori -c \"$izopen_tmp/midori-$tunnel_port_use\" \"$args\""
+	  helper_cmd="midori -c \"$izopen_tmp_dir/midori-$tunnel_port_current\" \"$args\""
 	fi
     else
 	helper_cmd="xdg-open \"$args\""
@@ -202,7 +210,7 @@ helper_cifs() {
 
 helper_tunnel_create() {
  # put specific address port forwarding port config file
- izopen_tmp_socks_address="$izopen_tmp/socks_host_$(echo $address | sed -e 's/[^A-Za-z0-9_-]/_/g').conf"
+ izopen_tmp_socks_address="$izopen_tmp_dir/socks_host_$(echo $address | sed -e 's/[^A-Za-z0-9_-]/_/g').conf"
 
  # don't create a new tunnel if it's already opened
  if [ -f "$izopen_tmp_socks_address" ]
@@ -212,67 +220,71 @@ helper_tunnel_create() {
  fi
  if [ "$tunnel_create" = 1 ]
   then
-	  if   [ ! -e "$izopen_tmp_socks_all" ] ; then
-		mkdir -p "$izopen_tmp"
-		tunnel_port_create=$tunnel_ports_start
-		echo $tunnel_port_create > "$izopen_tmp_socks_all"
-	  elif [ -e "$izopen_tmp_socks_address" ] ; then 
+          # import port configuration of remote address if exist
+	  if   [ -e "$izopen_tmp_socks_address" ] ; then 
 		tunnel_port_create="$(cat "$izopen_tmp_socks_address")"
-	  elif [ -e "$izopen_tmp_socks_all" ] ; then
-		let tunnel_port_create="$(cat "$izopen_tmp_socks_all")+1"
-		echo $tunnel_port_create > "$izopen_tmp_socks_all"
+	  elif [ -e "$izopen_tmp_socks_port_last" ] ; then
+		let tunnel_port_create="$(cat "$izopen_tmp_socks_port_last")+1"
+		echo $tunnel_port_create > "$izopen_tmp_socks_port_last"
+          fi
+
+          # create config file containing last used port
+	  if   [ ! -e "$izopen_tmp_socks_port_last" ] ; then
+		mkdir -p "$izopen_tmp"
+		tunnel_port_create=$tunnel_port_min
+		echo $tunnel_port_create > "$izopen_tmp_socks_port_last"
 	  fi
 
 	  # save the current address used port
 	  echo $tunnel_port_create > "$izopen_tmp_socks_address"
 
 	  # save the last used/reused port
-	  echo $tunnel_port_create > "$izopen_tmp_socks_last"
+	  echo $tunnel_port_create > "$izopen_tmp_socks_port_current"
 
 	  # dynamic port forwarding with compression
 	  # add ssh options to create socks tunnel and compression
-	  helper_cmd_opts="-D $tunnel_port_create"
+	  helper_cmd_opts+="-D $tunnel_port_create "
  fi
 }
 
 helper_tunnel() {
- tunnel_ports_all="$(cat $izopen_tmp_socks_all 2>/dev/null)"
- tunnel_ports_last="$(cat $izopen_tmp_socks_last 2>/dev/null)"
- [ -z "$tunnel_ports_all" ] && tunnel_ports_all=4999
- [ -z "$tunnel_ports_last" ] && tunnel_ports_last=$tunnel_ports_start
-
- # don't use tunnel if the schema is ssh and is not forced
- [[ "$schema" = "ssh" && "$tunnel_use_force_ssh" = 0 ]] && tunnel_use=0
+ [ -z "$tunnel_port_last" ] && tunnel_port_last=$tunnel_port_min
 
  # create the ssh tunnel if the url is ssh://
- [ "$schema" = "ssh" ] && helper_tunnel_create
+ case ${schema} in
+   ssh)
+       # don't use tunnel if the schema is ssh and is not forced
+       [ "$tunnel_use_force_ssh" = 0 ] && tunnel_use=0
+       helper_tunnel_create
+       ;;
+ esac
 
  # ask for a port if we want use a tunnel
  if [ $tunnel_use = 1 ] ; then
-   #tunnel_port_use=$(yad --title "izOpen SSH Proxy" --entry --entry-text=$tunnel_ports_last --text="Inserire la porta del Proxy Socks \nCompresa fra $tunnel_ports_start e $tunnel_ports_all\n" 2>/dev/null)
-   tunnel_port_use=$(yad --title "izOpen SSH Proxy" --entry --numeric --entry-text=$tunnel_ports_last --text="<b>Inserire la porta del Proxy Socks</b> \nCompresa fra $tunnel_ports_start e $tunnel_ports_all\n" $tunnel_ports_start $tunnel_ports_all --timeout=10 --timeout-indicator=bottom)
+   #tunnel_port_current=$(yad --title "izOpen SSH Proxy" --entry --entry-text=$tunnel_port_last --text="Inserire la porta del Proxy Socks \nCompresa fra $tunnel_port_min e $tunnel_port_max\n" 2>/dev/null)
+   tunnel_port_current=$(yad --center --title "izOpen SSH Proxy" --entry --numeric --entry-text=$tunnel_port_last --text="<b>Inserire la porta del Proxy Socks</b> \nCompresa fra $tunnel_port_min e $tunnel_port_max\n" $tunnel_port_min $tunnel_port_max --timeout=10 --timeout-indicator=bottom)
    # save the last used/reused port
-   [ ! -z "$tunnel_port_use" ] && echo $tunnel_port_use > "$izopen_tmp_socks_last"
+   [ ! -z "$tunnel_port_current" ] && echo $tunnel_port_current > "$izopen_tmp_socks_port_current"
  fi
 
  # debug
  #echo tunnel_create=$tunnel_create
  #echo tunnel_use=$tunnel_use
- #echo tunnel_port_use="$tunnel_port_use"
+ #echo tunnel_port_current="$tunnel_port_current"
 
  # create the proxychains4 config
- if [[ ! -z $tunnel_port_use && $tunnel_port_use =~ ^-?[0-9]+$ && $tunnel_port_use -ge $tunnel_ports_start && $tunnel_port_use -le 4999 ]]
+ if [[ ! -z $tunnel_port_current && $tunnel_port_current =~ ^-?[0-9]+$ && $tunnel_port_current -ge $tunnel_port_min && $tunnel_port_current -le 4999 ]]
   then
         # proxychains configuration
-	izopen_tmp_socks_proxy="$izopen_tmp/proxychains.$tunnel_port_use.conf"
-        echo -e "strict_chain\nquiet_mode\nproxy_dns\n[ProxyList]\nsocks5  127.0.0.1 $tunnel_port_use" > "$izopen_tmp_socks_proxy"
-        helper_cmd_prepend="proxychains4 -f $izopen_tmp_socks_proxy"
+	izopen_tmp_socks_proxy="$izopen_tmp_dir/proxychains.$tunnel_port_current.conf"
+        echo -e "strict_chain\nquiet_mode\nproxy_dns\n[ProxyList]\nsocks5  127.0.0.1 $tunnel_port_current" > "$izopen_tmp_socks_proxy"
+        helper_cmd_prepend="proxychains4 -f $izopen_tmp_socks_proxy "
   else
-    [ ! -z $tunnel_port_use ] && yad --error --text="La porta specificata non è valida: $tunnel_port_use\n\nInserire una porta compresa fra $tunnel_ports_start e $tunnel_ports_all" 2>/dev/null && unset tunnel_port_use
+    [ ! -z $tunnel_port_current ] && yad --center --error --text="La porta specificata non è valida: $tunnel_port_current\n\nInserire una porta compresa fra $tunnel_port_min e $tunnel_port_max" 2>/dev/null && unset tunnel_port_current
  fi
 
  # don't use tunnel socks proxy if the port is not specified or wrong
- [ -z $tunnel_port_use ] && tunnel_use=0
+ [ -z $tunnel_port_current ] && tunnel_use=0
 }
 
 print_debug() {
@@ -315,14 +327,14 @@ open_uri() {
 		if [[ "$schema" = "http" && $helper_http_chrome = 1 ]]; then
 		  helper_cmd="$helper_cmd"
 		else
-		  helper_cmd="$helper_cmd_prepend $helper_cmd"
+		  helper_cmd="${helper_cmd_prepend}${helper_cmd}"
 		fi
 
 		[ $debug = 1 ] && print_debug
 
 		# connect to remote server
 		eval "$helper_cmd"
-                [ $? != 0 ] && tail -n 20 /tmp/izopen.log | yad --width=800 --height=400 --title "Connection Error" --button=gtk-close:0 --text "Last 20 rows of file /tmp/izopen.log" --text-info
+                [ $? != 0 ] && tail -n 20 /tmp/izopen.log | yad --center --width=900 --height=500 --title "Connection Error" --button=gtk-close:0 --text "Last 20 rows of file /tmp/izopen.log" --text-info
 		;;
         *)
 		echo "ERROR: invalid URI specified: $args"
@@ -488,7 +500,7 @@ case $1 in
 	open_uri "$@"
 	;;
   clean)
-	rm -f "$izopen_tmp"/*.conf
+	#rm -f "$izopen_tmp_dir"/*.conf
 	;;
 
        *)
