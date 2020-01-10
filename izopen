@@ -42,11 +42,10 @@ tunnel_use_force=1		# always use the tunnel for every opened url
 tunnel_use_force_ssh=0		# always use the tunnel if connecting via ssh
 
 izopen_tmp_dir="$HOME/.config/izopen"
-izopen_tmp_socks_port_last="$izopen_tmp_dir/socks_port_last.conf"
-izopen_tmp_socks_port_current="$izopen_tmp_dir/socks_port_current.conf"
 tunnel_port_min=2000
 tunnel_port_max=4999
-[ -e "$izopen_tmp_socks_port_current" ] && tunnel_port_last="$(cat $izopen_tmp_socks_port_current)"
+izopen_tmp_socks_port_current="$izopen_tmp_dir/socks_port_current.conf"
+[ -e "$izopen_tmp_socks_port_current" ] && tunnel_port_current="$(cat "$izopen_tmp_socks_port_current")"
 
 # import configuration from izopen.conf if exist
 [ -f "/tmp/izopen.conf" ] && . /tmp/izopen.conf
@@ -132,13 +131,13 @@ helper_rdp() {
   #username="$(echo "$username" | sed 's/\//\\\\/g')"
 
   if [[ -z "$address" || -z "$username" || -z "$password" || "$username" = "{USERNAME}" || "$password" = "{PASSWORD}" || "$username" = "%7BUSERNAME%7D" || "$password" = "%7BPASSWORD%7D" ]]; then
-  frmdata=$(yad --center --title "Connect to remote computer" --focus-field=4 --align=right --form --field="Domain" "$domain" --field="Address" "$address" --field="Username" "$username" --field="Password:H" "$password" --field="TLS:CHK" "$tls")
-  [ $? != 0 ] && exit 1
-  domain=$(echo $frmdata | awk 'BEGIN {FS="|" } { print $1 }')
-  address=$(echo $frmdata | awk 'BEGIN {FS="|" } { print $2 }')
-  username=$(echo $frmdata | awk 'BEGIN {FS="|" } { print $3 }')
-  password=$(echo $frmdata | awk 'BEGIN {FS="|" } { print $4 }')
-  tls=$(echo $frmdata | awk 'BEGIN {FS="|" } { print $5 }')
+    frmdata=$(yad --center --width=300 --title "Connect to remote computer" --focus-field=4 --align=right --form --field="Domain" "$domain" --field="Address" "$address" --field="Username" "$username" --field="Password:H" "$password" --field="TLS:CHK" "$tls")
+    [ $? != 0 ] && exit 1
+    domain=$(echo $frmdata | awk 'BEGIN {FS="|" } { print $1 }')
+    address=$(echo $frmdata | awk 'BEGIN {FS="|" } { print $2 }')
+    username=$(echo $frmdata | awk 'BEGIN {FS="|" } { print $3 }')
+    password=$(echo $frmdata | awk 'BEGIN {FS="|" } { print $4 }')
+    tls=$(echo $frmdata | awk 'BEGIN {FS="|" } { print $5 }')
   fi
 
   case $helper_cmd_rdp in
@@ -151,6 +150,7 @@ helper_rdp() {
       [ ! -z "$domain" ] && helper_cmd_opts+=" /d:$domain"
       [ ! -z "$username" ] && helper_cmd_opts+=" /u:$username"
       [ ! -z "$password" ] && helper_cmd_opts+=" /p:\"$password\""
+      [   -z "$password" ] && helper_cmd_opts+=" /p:\"\""
       [ ! -z "$port" ] && helper_cmd_opts+=" /port:$port"
 
       helper_cmd="$helper_cmd_rdp "$helper_cmd_opts" /v:$address"
@@ -220,20 +220,29 @@ helper_tunnel_create() {
  fi
  if [ "$tunnel_create" = 1 ]
   then
+          # make tmp dir if not exist
+          [ ! -e "$izopen_tmp_dir" ] && mkdir -p "$izopen_tmp_dir"
+
           # import port configuration of remote address if exist
-	  if   [ -e "$izopen_tmp_socks_address" ] ; then 
+	  if [ -e "$izopen_tmp_socks_address" ] ; then 
 		tunnel_port_create="$(cat "$izopen_tmp_socks_address")"
-	  elif [ -e "$izopen_tmp_socks_port_last" ] ; then
-		let tunnel_port_create="$(cat "$izopen_tmp_socks_port_last")+1"
-		echo $tunnel_port_create > "$izopen_tmp_socks_port_last"
           fi
 
-          # create config file containing last used port
-	  if   [ ! -e "$izopen_tmp_socks_port_last" ] ; then
-		mkdir -p "$izopen_tmp"
-		tunnel_port_create=$tunnel_port_min
-		echo $tunnel_port_create > "$izopen_tmp_socks_port_last"
-	  fi
+          if [ ! -e "$izopen_tmp_socks_address" ] ; then
+              # find first free port
+              local port
+              port=$tunnel_port_min
+
+              until [ ! -z "$tunnel_port_create" ]; do
+                izopen_tmp_socks_proxy="$izopen_tmp_dir/proxychains.$port.conf"
+                if [ ! -e "$izopen_tmp_socks_proxy" ];then 
+                    tunnel_port_create=$port 
+                    echo -e "strict_chain\nquiet_mode\nproxy_dns\n[ProxyList]\nsocks5  127.0.0.1 $port" > "$izopen_tmp_socks_proxy"
+                  else
+                    let port++
+                fi
+              done
+          fi
 
 	  # save the current address used port
 	  echo $tunnel_port_create > "$izopen_tmp_socks_address"
@@ -248,8 +257,6 @@ helper_tunnel_create() {
 }
 
 helper_tunnel() {
- [ -z "$tunnel_port_last" ] && tunnel_port_last=$tunnel_port_min
-
  # create the ssh tunnel if the url is ssh://
  case ${schema} in
    ssh)
@@ -261,26 +268,26 @@ helper_tunnel() {
 
  # ask for a port if we want use a tunnel
  if [ $tunnel_use = 1 ] ; then
-   #tunnel_port_current=$(yad --title "izOpen SSH Proxy" --entry --entry-text=$tunnel_port_last --text="Inserire la porta del Proxy Socks \nCompresa fra $tunnel_port_min e $tunnel_port_max\n" 2>/dev/null)
-   tunnel_port_current=$(yad --center --title "izOpen SSH Proxy" --entry --numeric --entry-text=$tunnel_port_last --text="<b>Inserire la porta del Proxy Socks</b> \nCompresa fra $tunnel_port_min e $tunnel_port_max\n" $tunnel_port_min $tunnel_port_max --timeout=10 --timeout-indicator=bottom)
-   # save the last used/reused port
+   #tunnel_port_current=$(yad --title "izOpen SSH Proxy" --entry --entry-text=$tunnel_port_current --text="Inserire la porta del Proxy Socks \nCompresa fra $tunnel_port_min e $tunnel_port_max\n" 2>/dev/null)
+
+   tunnel_port_current=$(yad --center --title "izOpen SSH Proxy" --entry --numeric --entry-text=$tunnel_port_current --text="<b>Inserire la porta del Proxy Socks</b> \nCompresa fra $tunnel_port_min e $tunnel_port_max\n" $tunnel_port_min $tunnel_port_max --timeout=10 --timeout-indicator=bottom)
+
+   # save the current used port for later usage
    [ ! -z "$tunnel_port_current" ] && echo $tunnel_port_current > "$izopen_tmp_socks_port_current"
  fi
 
  # debug
- #echo tunnel_create=$tunnel_create
- #echo tunnel_use=$tunnel_use
- #echo tunnel_port_current="$tunnel_port_current"
+ echo tunnel_create=$tunnel_create
+ echo tunnel_use=$tunnel_use
+ echo tunnel_port_current="$tunnel_port_current"
 
  # create the proxychains4 config
- if [[ ! -z $tunnel_port_current && $tunnel_port_current =~ ^-?[0-9]+$ && $tunnel_port_current -ge $tunnel_port_min && $tunnel_port_current -le 4999 ]]
+ if [[ $tunnel_use = 1 && ! -z $tunnel_port_current && $tunnel_port_current =~ ^-?[0-9]+$ && $tunnel_port_current -ge $tunnel_port_min && $tunnel_port_current -le $tunnel_port_max ]]
   then
         # proxychains configuration
-	izopen_tmp_socks_proxy="$izopen_tmp_dir/proxychains.$tunnel_port_current.conf"
-        echo -e "strict_chain\nquiet_mode\nproxy_dns\n[ProxyList]\nsocks5  127.0.0.1 $tunnel_port_current" > "$izopen_tmp_socks_proxy"
         helper_cmd_prepend="proxychains4 -f $izopen_tmp_socks_proxy "
-  else
-    [ ! -z $tunnel_port_current ] && yad --center --error --text="La porta specificata non è valida: $tunnel_port_current\n\nInserire una porta compresa fra $tunnel_port_min e $tunnel_port_max" 2>/dev/null && unset tunnel_port_current
+#  else
+#    [ ! -z $tunnel_port_current ] && yad --center --error --text="La porta specificata non è valida: $tunnel_port_current\n\nInserire una porta compresa fra $tunnel_port_min e $tunnel_port_max" 2>/dev/null && unset tunnel_port_current
  fi
 
  # don't use tunnel socks proxy if the port is not specified or wrong
