@@ -277,9 +277,9 @@ helper_tunnel() {
  fi
 
  # debug
- echo tunnel_create=$tunnel_create
- echo tunnel_use=$tunnel_use
- echo tunnel_port_current="$tunnel_port_current"
+ #echo tunnel_create=$tunnel_create
+ #echo tunnel_use=$tunnel_use
+ #echo tunnel_port_current="$tunnel_port_current"
 
  # create the proxychains4 config
  if [[ $tunnel_use = 1 && ! -z $tunnel_port_current && $tunnel_port_current =~ ^-?[0-9]+$ && $tunnel_port_current -ge $tunnel_port_min && $tunnel_port_current -le $tunnel_port_max ]]
