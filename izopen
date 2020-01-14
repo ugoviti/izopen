@@ -285,7 +285,7 @@ helper_tunnel() {
  if [[ $tunnel_use = 1 && ! -z $tunnel_port_current && $tunnel_port_current =~ ^-?[0-9]+$ && $tunnel_port_current -ge $tunnel_port_min && $tunnel_port_current -le $tunnel_port_max ]]
   then
         # proxychains configuration
-        helper_cmd_prepend="proxychains4 -f $izopen_tmp_socks_proxy "
+        helper_cmd_prepend="proxychains4 -f $izopen_tmp_dir/proxychains.$tunnel_port_current.conf "
 #  else
 #    [ ! -z $tunnel_port_current ] && yad --center --error --text="La porta specificata non è valida: $tunnel_port_current\n\nInserire una porta compresa fra $tunnel_port_min e $tunnel_port_max" 2>/dev/null && unset tunnel_port_current
  fi
