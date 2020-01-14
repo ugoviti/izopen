@@ -308,7 +308,7 @@ print_debug() {
 	echo "      path: $path"
 	echo "   uri tmp: $uritmp"
 	echo "helper cmd: $helper_cmd"
-	echo "========================================================================================"
+	echo "--- output:"
 }
 
 open_uri() {
@@ -341,7 +341,7 @@ open_uri() {
 
 		# connect to remote server
 		eval "$helper_cmd"
-                [ $? != 0 ] && tail -n 20 /tmp/izopen.log | yad --center --width=900 --height=500 --title "Connection Error" --button=gtk-close:0 --text "Last 20 rows of file /tmp/izopen.log" --text-info
+                [ $? != 0 ] && tail -n 30 /tmp/izopen.log | sed -n 'H; /^=/h; ${g;p;}' | yad --center --width=900 --height=500 --title "Connection Error" --button=gtk-close:0 --text "Errors from /tmp/izopen.log" --text-info
 		;;
         *)
 		echo "ERROR: invalid URI specified: $args"
