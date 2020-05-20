@@ -127,6 +127,9 @@ helper_rdp() {
   #password="$(echo "$password" | sed -e 's/%\([A-Z]\)/%\L\1/')" # keepassxc bug workaround: after the '%' char, keepassxc convert to uppercase the following char
   password="$(echo "$password" | sed 's/\%25/\%/g' | sed -e 's/%\([A-Z]\)/%\L\1/')" # keepassxc bug workaround: after the '%' char, keepassxc convert to uppercase the following char
 
+  # special characters in password like ' !
+  password="$(echo "$password" | sed -e "s/'/\\\'/g" -e "s/!/\\\!/g")"
+
   #[ -z "$username" ] && username=$domain && unset domain
   #username="$(echo "$username" | sed 's/\//\\\\/g')"
 
@@ -147,8 +150,8 @@ helper_rdp() {
     xfreerdp)
       helper_cmd_opts+="/drive:r,/ramdisk +clipboard /kbd:Italian /size:85% /cert-tofu /cert-ignore /log-level:ERROR"
       [ "$tls" = "TRUE" ] && helper_cmd_opts+=" /sec:tls"
-      [ ! -z "$domain" ] && helper_cmd_opts+=" /d:$domain"
-      [ ! -z "$username" ] && helper_cmd_opts+=" /u:$username"
+      [ ! -z "$domain" ] && helper_cmd_opts+=" /d:\"$domain\""
+      [ ! -z "$username" ] && helper_cmd_opts+=" /u:\"$username\""
       [ ! -z "$password" ] && helper_cmd_opts+=" /p:\"$password\""
       [   -z "$password" ] && helper_cmd_opts+=" /p:\"\""
       [ ! -z "$port" ] && helper_cmd_opts+=" /port:$port"
@@ -182,8 +185,8 @@ helper_http() {
 	else
 	  helper_cmd="midori -c \"$izopen_tmp_dir/midori-$tunnel_port_current\" \"$args\""
 	fi
-    else
-	helper_cmd="xdg-open \"$args\""
+#    else
+#	helper_cmd="xdg-open \"$args\""
   fi
 }
 
