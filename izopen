@@ -134,13 +134,13 @@ helper_rdp() {
   #username="$(echo "$username" | sed 's/\//\\\\/g')"
 
   if [[ -z "$address" || -z "$username" || -z "$password" || "$username" = "{USERNAME}" || "$password" = "{PASSWORD}" || "$username" = "%7BUSERNAME%7D" || "$password" = "%7BPASSWORD%7D" ]]; then
-    frmdata=$(yad --center --width=300 --title "Connect to remote computer" --focus-field=4 --align=right --form --field="Domain" "$domain" --field="Address" "$address" --field="Username" "$username" --field="Password:H" "$password" --field="TLS:CHK" "$tls")
+    frmdata=$(yad --center --width=300 --title "Connect to remote computer" --focus-field=4 --align=right --form --field="Domain" "$domain" --field="Address" "$address" --field="Username" "$username" --field="Password:H" "$password" --field="Security:CB" '^rdp!tls!nla!ext')
     [ $? != 0 ] && exit 1
     domain=$(echo $frmdata | awk 'BEGIN {FS="|" } { print $1 }')
     address=$(echo $frmdata | awk 'BEGIN {FS="|" } { print $2 }')
     username=$(echo $frmdata | awk 'BEGIN {FS="|" } { print $3 }')
     password=$(echo $frmdata | awk 'BEGIN {FS="|" } { print $4 }')
-    tls=$(echo $frmdata | awk 'BEGIN {FS="|" } { print $5 }')
+    sec=$(echo $frmdata | awk 'BEGIN {FS="|" } { print $5 }')
   fi
 
   case $helper_cmd_rdp in
@@ -149,12 +149,12 @@ helper_rdp() {
       ;;
     xfreerdp)
       helper_cmd_opts+="/drive:r,/ramdisk +clipboard /kbd:Italian /size:85% /cert-tofu /cert-ignore /log-level:ERROR"
-      [ "$tls" = "TRUE" ] && helper_cmd_opts+=" /sec:tls"
-      [ ! -z "$domain" ] && helper_cmd_opts+=" /d:\"$domain\""
+      [ ! -z "$sec" ]      && helper_cmd_opts+=" /sec:$sec"
+      [ ! -z "$domain" ]   && helper_cmd_opts+=" /d:\"$domain\""
       [ ! -z "$username" ] && helper_cmd_opts+=" /u:\"$username\""
       [ ! -z "$password" ] && helper_cmd_opts+=" /p:\"$password\""
       [   -z "$password" ] && helper_cmd_opts+=" /p:\"\""
-      [ ! -z "$port" ] && helper_cmd_opts+=" /port:$port"
+      [ ! -z "$port" ]     && helper_cmd_opts+=" /port:$port"
 
       helper_cmd="$helper_cmd_rdp "$helper_cmd_opts" /v:$address"
       ;;
