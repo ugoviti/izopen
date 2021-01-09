@@ -134,7 +134,7 @@ helper_rdp() {
   #username="$(echo "$username" | sed 's/\//\\\\/g')"
 
   if [[ -z "$address" || -z "$username" || -z "$password" || "$username" = "{USERNAME}" || "$password" = "{PASSWORD}" || "$username" = "%7BUSERNAME%7D" || "$password" = "%7BPASSWORD%7D" ]]; then
-    frmdata=$(yad --center --width=300 --title "Connect to remote computer" --focus-field=4 --align=right --form --field="Domain" "$domain" --field="Address" "$address" --field="Username" "$username" --field="Password:H" "$password" --field="Security:CB" '^rdp!tls!nla!ext')
+    frmdata=$(yad --center --width=300 --title "Connect to remote computer" --focus-field=4 --align=right --form --field="Domain" "$domain" --field="Address" "$address" --field="Username" "$username" --field="Password:H" "$password" --field="Security:CB" 'rdp!tls!^nla!ext' | grep -v "WINDOW DECORATIONS RELOADED")
     [ $? != 0 ] && exit 1
     domain=$(echo $frmdata | awk 'BEGIN {FS="|" } { print $1 }')
     address=$(echo $frmdata | awk 'BEGIN {FS="|" } { print $2 }')
@@ -273,7 +273,7 @@ helper_tunnel() {
  if [ $tunnel_use = 1 ] ; then
    #tunnel_port_current=$(yad --title "izOpen SSH Proxy" --entry --entry-text=$tunnel_port_current --text="Inserire la porta del Proxy Socks \nCompresa fra $tunnel_port_min e $tunnel_port_max\n" 2>/dev/null)
 
-   tunnel_port_current=$(yad --center --title "izOpen SSH Proxy" --entry --numeric --entry-text=$tunnel_port_current --text="<b>Inserire la porta del Proxy Socks</b> \nCompresa fra $tunnel_port_min e $tunnel_port_max\n" $tunnel_port_min $tunnel_port_max --timeout=10 --timeout-indicator=bottom)
+   tunnel_port_current=$(yad --center --title "izOpen SSH Proxy" --entry --numeric --entry-text=$tunnel_port_current --text="<b>Inserire la porta del Proxy Socks</b> \nCompresa fra $tunnel_port_min e $tunnel_port_max\n" $tunnel_port_min $tunnel_port_max --timeout=10 --timeout-indicator=bottom | tr -d [:alpha:] | tr -d [:cntrl:] | tr -d [:space:])
 
    # save the current used port for later usage
    [ ! -z "$tunnel_port_current" ] && echo $tunnel_port_current > "$izopen_tmp_socks_port_current"
@@ -344,7 +344,7 @@ open_uri() {
 
 		# connect to remote server
 		eval "$helper_cmd"
-                [ $? != 0 ] && tail -n 30 /tmp/izopen.log | sed -n 'H; /^=/h; ${g;p;}' | yad --center --width=900 --height=500 --title "Connection Error" --button=gtk-close:0 --text "Errors from /tmp/izopen.log" --text-info
+                [ $? != 0 ] && tail -n 30 /tmp/izopen.log | sed -n 'H; /^=/h; ${g;p;}' | yad --center --width=900 --height=500 --title "Connection Error" --button=gtk-close:0 --text "Errors from /tmp/izopen.log" --text-info | grep -v "WINDOW DECORATIONS RELOADED"
 		;;
         *)
 		echo "ERROR: invalid URI specified: $args"
