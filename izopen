@@ -145,15 +145,15 @@ helper_rdp() {
 
   case $helper_cmd_rdp in
     rdesktop)
-      helper_cmd="$helper_cmd_rdp -k it -g 1280x780 $([ -n "$domain" ] && echo "-d \"$domain\"") $([ -n "$username" ] && echo "-u \"$username\"")  $([ -n "$password" ] && echo "-p \"$password\"") $address$([ -n "$port" ] && echo ":$port")"
+      helper_cmd="$helper_cmd_rdp -k it -g 1280x780 $([ -n "$domain" ] && echo "-d \"$domain\"") $([ -n "$username" ] && echo "-u \"$username\"")  $([ -n "$password" ] && echo "-p \'$password\'") $address$([ -n "$port" ] && echo ":$port")"
       ;;
     xfreerdp)
       helper_cmd_opts+="/drive:r,/ramdisk +clipboard /kbd:Italian /size:85% /cert-tofu /cert-ignore /log-level:ERROR"
       [ ! -z "$sec" ]      && helper_cmd_opts+=" /sec:$sec"
-      [ ! -z "$domain" ]   && helper_cmd_opts+=" /d:\"$domain\""
-      [ ! -z "$username" ] && helper_cmd_opts+=" /u:\"$username\""
-      [ ! -z "$password" ] && helper_cmd_opts+=" /p:\"$password\""
-      [   -z "$password" ] && helper_cmd_opts+=" /p:\"\""
+      [ ! -z "$domain" ]   && helper_cmd_opts+=" /d:'$domain'"
+      [ ! -z "$username" ] && helper_cmd_opts+=" /u:'$username'"
+      [ ! -z "$password" ] && helper_cmd_opts+=" /p:'$password'"
+      [   -z "$password" ] && helper_cmd_opts+=" /p:''"
       [ ! -z "$port" ]     && helper_cmd_opts+=" /port:$port"
 
       helper_cmd="$helper_cmd_rdp "$helper_cmd_opts" /v:$address"
