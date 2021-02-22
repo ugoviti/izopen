@@ -125,10 +125,10 @@ helper_rdp() {
 
   # FIXME
   #password="$(echo "$password" | sed -e 's/%\([A-Z]\)/%\L\1/')" # keepassxc bug workaround: after the '%' char, keepassxc convert to uppercase the following char
-  password="$(echo "$password" | sed 's/\%25/\%/g' | sed -e 's/%\([A-Z]\)/%\L\1/')" # keepassxc bug workaround: after the '%' char, keepassxc convert to uppercase the following char
+  password="$(echo -e -n "$password" | sed 's/\%25/\%/g' | sed -e 's/%\([A-Z]\)/%\L\1/')" # keepassxc bug workaround: after the '%' char, keepassxc convert to uppercase the following char
 
-  # special characters in password like ' !
-  password="$(echo "$password" | sed -e "s/'/\\\'/g" -e "s/!/\\\!/g")"
+  # special characters in password like ',!
+  password="$(echo -e -n "$password" | sed -e "s/'/\\\'/g" -e "s/!/\\\!/g")"
 
   #[ -z "$username" ] && username=$domain && unset domain
   #username="$(echo "$username" | sed 's/\//\\\\/g')"
@@ -145,18 +145,24 @@ helper_rdp() {
 
   case $helper_cmd_rdp in
     rdesktop)
-      helper_cmd="$helper_cmd_rdp -k it -g 1280x780 $([ -n "$domain" ] && echo "-d \"$domain\"") $([ -n "$username" ] && echo "-u \"$username\"")  $([ -n "$password" ] && echo "-p \'$password\'") $address$([ -n "$port" ] && echo ":$port")"
+      helper_cmd_opts+="-k it -g 1280x780"
+      [ -n "$domain" ]   && helper_cmd_opts+=" -d '$domain'"
+      [ -n "$username" ] && helper_cmd_opts+=" -u '$username'"
+      [ -n "$password" ] && helper_cmd_opts+=" -p '$password'"
+      [ -n "$port" ]     && port=":$port"
+
+      helper_cmd="${helper_cmd_rdp} "${helper_cmd_opts}" ${address}${port}"
       ;;
     xfreerdp)
       helper_cmd_opts+="/drive:r,/ramdisk +clipboard /kbd:Italian /size:85% /cert-tofu /cert-ignore /log-level:ERROR"
       [ ! -z "$sec" ]      && helper_cmd_opts+=" /sec:$sec"
       [ ! -z "$domain" ]   && helper_cmd_opts+=" /d:'$domain'"
       [ ! -z "$username" ] && helper_cmd_opts+=" /u:'$username'"
-      [ ! -z "$password" ] && helper_cmd_opts+=" /p:'$password'"
+      [ ! -z "$password" ] && helper_cmd_opts+=" /p:\"$password\""
       [   -z "$password" ] && helper_cmd_opts+=" /p:''"
       [ ! -z "$port" ]     && helper_cmd_opts+=" /port:$port"
 
-      helper_cmd="$helper_cmd_rdp "$helper_cmd_opts" /v:$address"
+      helper_cmd="${helper_cmd_rdp} "${helper_cmd_opts}" /v:${address}"
       ;;
   esac
 }
