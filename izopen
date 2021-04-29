@@ -70,6 +70,24 @@ helper_ssh() {
     helper_cmd_terminal="xterm"
   fi
 
+  if [ "$tunnel_create" = 1 ]; then
+     title="H:$address P:$tunnel_port_create"
+   else
+     title="H:$address"
+  fi
+
+  case $helper_cmd_terminal in
+    konsole)
+      tabtitle="(%u) %H"
+      RemoteTabTitleFormat="$title"
+      title_opts="-p tabtitle='$tabtitle' -p RemoteTabTitleFormat='$RemoteTabTitleFormat'"
+      #title_opts="-p RemoteTabTitleFormat='$title'"
+      ;;
+    *)
+      title_opts="--title \"$title\""
+      ;;
+  esac
+
   [ -z "$username" ] && read -p "username: " username;
   #[ -z "$password" ] && read -p "password: " password;
   
@@ -78,7 +96,7 @@ helper_ssh() {
   helper_cmd_opts+="-C $username@$address"
 
   # set the final command
-  helper_cmd="$helper_cmd_terminal --title \"$([ "$tunnel_create" = 1 ] && echo "H:$address P:$tunnel_port_create" || echo "H:$address")\" -e \"ssh $helper_cmd_opts\""
+  helper_cmd="$helper_cmd_terminal $title_opts -e \"ssh $helper_cmd_opts\""
 
   ####################### 
   # test colorized prompt
