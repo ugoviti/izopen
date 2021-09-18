@@ -30,10 +30,16 @@
 # KeePassX 2.x integration (Fedora >= 23):
 #        dnf install -y yad kdelibs3 proxychains-ng keepassx
 
+### UPGRADE COMMANDS for release after 20210918:
+# cd $HOME/.config/izopen
+# mkdir -p $HOME/.config/izopen/{google-chrome,proxychains}
+# find -maxdepth 1 -type d -name "google-chrome-*" | while read dir ; do mv "$dir" google-chrome/$(echo $dir | cut -d '-' -f 3) ; done
+# find -maxdepth 1 -type f -name "proxychains.*.conf" | while read dir ; do mv "$dir" proxychains/$(echo $dir | cut -d '.' -f 3).conf ; done
+# find -maxdepth 1 -type f -name "socks_host_*.conf" | while read dir ; do mv "$dir" $(echo $dir | sed 's/socks_host_//') ; done
 
 # variables
 #########################################################################
-debug=1				# enable script debug
+debug=1 # enable script debug
 
 helper_http_chrome=1		# use google chrome as web browser (this needed because proxychains doens't works with google chrome)
 
@@ -205,7 +211,7 @@ helper_http() {
     then
 	if [ $helper_http_chrome = 1 ] ; then
 	  #helper_cmd="google-chrome --media-cache-size=1 --disk-cache-size=1 --disable-client-side-phishing-detection --disable-gpu --restore-last-session --no-first-run --disable-translate --password-store=basic --user-data-dir=\"$izopen_tmp_dir/google-chrome-$tunnel_port_current\" --proxy-server=\"socks5://localhost:$tunnel_port_current\" \"$args\""
-	  helper_cmd="google-chrome --aggressive-cache-discard --disable-notifications --enable-aggressive-domstorage-flushing --disable-client-side-phishing-detection --disable-gpu --restore-last-session --no-first-run --disable-translate --password-store=basic --user-data-dir=\"$izopen_tmp_dir/google-chrome-$tunnel_port_current\" --proxy-server=\"socks5://localhost:$tunnel_port_current\" \"$args\""
+	  helper_cmd="google-chrome --aggressive-cache-discard --disable-notifications --enable-aggressive-domstorage-flushing --disable-client-side-phishing-detection --disable-gpu --restore-last-session --no-first-run --disable-translate --password-store=basic --user-data-dir=\"$izopen_tmp_dir/google-chrome/$tunnel_port_current\" --proxy-server=\"socks5://localhost:$tunnel_port_current\" \"$args\""
 	else
 	  helper_cmd="midori -c \"$izopen_tmp_dir/midori-$tunnel_port_current\" \"$args\""
 	fi
@@ -237,7 +243,7 @@ helper_cifs() {
 
 helper_tunnel_create() {
  # put specific address port forwarding port config file
- izopen_tmp_socks_address="$izopen_tmp_dir/socks_host_$(echo $address | sed -e 's/[^A-Za-z0-9_-]/_/g').conf"
+ izopen_tmp_socks_address="$izopen_tmp_dir/$(echo $address | sed -e 's/[^A-Za-z0-9_-]/_/g').conf"
 
  # don't create a new tunnel if it's already opened
  if [ -f "$izopen_tmp_socks_address" ]
@@ -261,7 +267,7 @@ helper_tunnel_create() {
               port=$tunnel_port_min
 
               until [ ! -z "$tunnel_port_create" ]; do
-                izopen_tmp_socks_proxy="$izopen_tmp_dir/proxychains.$port.conf"
+                izopen_tmp_socks_proxy="$izopen_tmp_dir/proxychains/$port.conf"
                 if [ ! -e "$izopen_tmp_socks_proxy" ];then 
                     tunnel_port_create=$port 
                     echo -e "strict_chain\nquiet_mode\nproxy_dns\n[ProxyList]\nsocks5  127.0.0.1 $port" > "$izopen_tmp_socks_proxy"
