@@ -2,8 +2,8 @@
 # multi protocol bash script to auto opening given URI and auto creating ssh reverse tunnel socks proxy
 # very useful to use with KeePassX or any Desktop/Browser Password Manager as secure URI launcher
 # Written by Ugo Viti <ugo.viti@initzero.it>
-#    date: 20200108
-# version: 2.5
+#    date: 20210919
+# version: 2.6
 
 # features:
 #    URI handling of: ssh, rdp, vnc, sftp, ftp, http, https, smb and cifs schemas
