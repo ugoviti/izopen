@@ -1,43 +1,50 @@
 #!/bin/bash
-# multi protocol bash script to auto opening given URI and auto creating ssh reverse tunnel socks proxy
-# very useful to use with KeePassX or any Desktop/Browser Password Manager as secure URI launcher
-# Written by Ugo Viti <ugo.viti@initzero.it>
-#    date: 20210919
-# version: 2.6
+## multi protocol bash script to auto opening given URI and auto creating ssh reverse tunnel socks proxy
+## very useful to use with KeePassX or any Desktop/Browser Password Manager as secure URI launcher
+## Written by Ugo Viti <ugo.viti@initzero.it>
+##    date: 20211124
+## version: 2.7
 
-# features:
-#    URI handling of: ssh, rdp, vnc, sftp, ftp, http, https, smb and cifs schemas
+## features:
+##    URI handling of: ssh, rdp, vnc, sftp, ftp, http, https, smb and cifs schemas
 
-# installation:
-#        simply copy this script into a user or system wide bin directory (suggestion: cp izopen ~/bin), must be into a PATH variable
+## installation:
+##        simply copy this script into a user or system wide bin directory (suggestion: cp izopen ~/bin), must be into a PATH variable
 
-# usage: izopen uri://username:password@address:port
+## custom config:
+## create a new ascii file into $HOME/.config/izopen/izopen.conf
+## examples:
+# helper_cmd_opts_http="--proxy-bypass-list='<-loopback>'"
+# helper_cmd_opts_rdp="/drive:share,$HOME/share"
+# nc_opts="-z"
 
-# examples:
-#        izopen http://www.example.com
-#        izopen http://john:doe@www.example.com
-#        izopen ssh://root:supersecurepassword@www.example.com
-#        izopen smb://Administrator:password@server
-#        izopen rdp://DOMAIN/Administrator:password@server
-#        izopen rdp:///Administrator:password@server
+## usage: izopen uri://username:password@address:port
 
-# KeePassX 0.x integration:
-#        into advanded settings of keepassx select "Custom Browser Command" and insert:
-#        izopen %1
-#        for every account stored into your database, write into URL field: uri://{USERNAME}:{PASSWORD}@address:port
-#        example: rdp://{USERNAME}:{PASSWORD}@www.example.com:3389
+## examples:
+##        izopen http://www.example.com
+##        izopen http://john:doe@www.example.com
+##        izopen ssh://root:supersecurepassword@www.example.com
+##        izopen smb://Administrator:password@server
+##        izopen rdp://DOMAIN/Administrator:password@server
+##        izopen rdp:///Administrator:password@server
 
-# KeePassX 2.x integration (Fedora >= 23):
-#        dnf install -y yad kdelibs3 proxychains-ng keepassx
+## KeePassX 0.x integration:
+##        into advanded settings of keepassx select "Custom Browser Command" and insert:
+##        izopen %1
+##        for every account stored into your database, write into URL field: uri://{USERNAME}:{PASSWORD}@address:port
+##        example: rdp://{USERNAME}:{PASSWORD}@www.example.com:3389
+
+## KeePassX 2.x integration (Fedora >= 23):
+##        dnf install -y yad kdelibs3 proxychains-ng keepassx
 
 ### UPGRADE COMMANDS for release after 20210918:
-# cd $HOME/.config/izopen
-# mkdir -p $HOME/.config/izopen/{google-chrome,proxychains}
-# find -maxdepth 1 -type d -name "google-chrome-*" | while read dir ; do mv "$dir" google-chrome/$(echo $dir | cut -d '-' -f 3) ; done
-# find -maxdepth 1 -type f -name "proxychains.*.conf" | while read dir ; do mv "$dir" proxychains/$(echo $dir | cut -d '.' -f 3).conf ; done
-# find -maxdepth 1 -type f -name "socks_host_*.conf" | while read dir ; do mv "$dir" $(echo $dir | sed 's/socks_host_//') ; done
+## cd $HOME/.config/izopen
+## mkdir -p $HOME/.config/izopen/{google-chrome,proxychains}
+## find -maxdepth 1 -type d -name "google-chrome-*" | while read dir ; do mv "$dir" google-chrome/$(echo $dir | cut -d '-' -f 3) ; done
+## find -maxdepth 1 -type f -name "proxychains.*.conf" | while read dir ; do mv "$dir" proxychains/$(echo $dir | cut -d '.' -f 3).conf ; done
+## find -maxdepth 1 -type f -name "socks_host_*.conf" | while read dir ; do mv "$dir" $(echo $dir | sed 's/socks_host_//') ; done
 
-# variables
+## variables
 #########################################################################
 debug=1 # enable script debug
 
@@ -48,13 +55,14 @@ tunnel_use_force=1		# always use the tunnel for every opened url
 tunnel_use_force_ssh=0		# always use the tunnel if connecting via ssh
 
 izopen_tmp_dir="$HOME/.config/izopen"
+izopen_conf_custom="$izopen_tmp_dir/izopen.conf"
 tunnel_port_min=2000
 tunnel_port_max=4999
 izopen_tmp_socks_port_current="$izopen_tmp_dir/socks_port_current.conf"
 [ -e "$izopen_tmp_socks_port_current" ] && tunnel_port_current="$(cat "$izopen_tmp_socks_port_current")"
 
 # import configuration from izopen.conf if exist
-[ -f "/tmp/izopen.conf" ] && . /tmp/izopen.conf
+[ -f "${izopen_conf_custom}" ] && source "${izopen_conf_custom}"
 
 # commands helper functions
 #########################################################################
@@ -178,7 +186,7 @@ helper_rdp() {
       helper_cmd="${helper_cmd_rdp} "${helper_cmd_opts}" ${address}${port}"
       ;;
     xfreerdp)
-      helper_cmd_opts+="/drive:r,/ramdisk +clipboard /kbd:Italian /size:85% /cert-tofu /cert-ignore /log-level:ERROR"
+      helper_cmd_opts+="${helper_cmd_opts_rdp} +clipboard /kbd:Italian /size:85% /cert-tofu /cert-ignore /log-level:ERROR"
       [ ! -z "$sec" ]      && helper_cmd_opts+=" /sec:$sec"
       [ ! -z "$domain" ]   && helper_cmd_opts+=" /d:'$domain'"
       [ ! -z "$username" ] && helper_cmd_opts+=" /u:'$username'"
@@ -211,7 +219,7 @@ helper_http() {
     then
 	if [ $helper_http_chrome = 1 ] ; then
 	  #helper_cmd="google-chrome --media-cache-size=1 --disk-cache-size=1 --disable-client-side-phishing-detection --disable-gpu --restore-last-session --no-first-run --disable-translate --password-store=basic --user-data-dir=\"$izopen_tmp_dir/google-chrome-$tunnel_port_current\" --proxy-server=\"socks5://localhost:$tunnel_port_current\" \"$args\""
-	  helper_cmd="google-chrome --aggressive-cache-discard --disable-notifications --enable-aggressive-domstorage-flushing --disable-client-side-phishing-detection --disable-gpu --restore-last-session --no-first-run --disable-translate --password-store=basic --user-data-dir=\"$izopen_tmp_dir/google-chrome/$tunnel_port_current\" --proxy-server=\"socks5://localhost:$tunnel_port_current\" \"$args\""
+	  helper_cmd="google-chrome --aggressive-cache-discard --disable-notifications --enable-aggressive-domstorage-flushing --disable-client-side-phishing-detection --disable-gpu --restore-last-session --no-first-run --disable-translate --password-store=basic --user-data-dir=\"$izopen_tmp_dir/google-chrome/$tunnel_port_current\" --proxy-server=\"socks5://localhost:$tunnel_port_current\" $helper_cmd_opts_http \"$args\""
 	else
 	  helper_cmd="midori -c \"$izopen_tmp_dir/midori-$tunnel_port_current\" \"$args\""
 	fi
@@ -248,7 +256,7 @@ helper_tunnel_create() {
  # don't create a new tunnel if it's already opened
  if [ -f "$izopen_tmp_socks_address" ]
   then
-	nc 127.0.0.1 $(cat "$izopen_tmp_socks_address") </dev/null 2>/dev/null
+	nc $nc_opts 127.0.0.1 $(cat "$izopen_tmp_socks_address") </dev/null 2>/dev/null
 	[ $? != 0 ] && tunnel_create=1 || tunnel_create=0
  fi
 
