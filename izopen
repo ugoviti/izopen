@@ -251,10 +251,12 @@ helper_tunnel_create() {
 	nc 127.0.0.1 $(cat "$izopen_tmp_socks_address") </dev/null 2>/dev/null
 	[ $? != 0 ] && tunnel_create=1 || tunnel_create=0
  fi
+
  if [ "$tunnel_create" = 1 ]
   then
           # make tmp dir if not exist
           [ ! -e "$izopen_tmp_dir" ] && mkdir -p "$izopen_tmp_dir"
+          [ ! -e "$izopen_tmp_dir/proxychains" ] && mkdir -p "$izopen_tmp_dir/proxychains"
 
           # import port configuration of remote address if exist
 	  if [ -e "$izopen_tmp_socks_address" ] ; then 
@@ -263,19 +265,22 @@ helper_tunnel_create() {
 
           if [ ! -e "$izopen_tmp_socks_address" ] ; then
               # find first free port
-              local port
-              port=$tunnel_port_min
+              local tunnel_port
+              tunnel_port=$tunnel_port_min
 
               until [ ! -z "$tunnel_port_create" ]; do
-                izopen_tmp_socks_proxy="$izopen_tmp_dir/proxychains/$port.conf"
-                if [ ! -e "$izopen_tmp_socks_proxy" ];then 
-                    tunnel_port_create=$port 
-                    echo -e "strict_chain\nquiet_mode\nproxy_dns\n[ProxyList]\nsocks5  127.0.0.1 $port" > "$izopen_tmp_socks_proxy"
+                izopen_tmp_socks_proxy="$izopen_tmp_dir/proxychains/$tunnel_port.conf"
+                if [ ! -e "$izopen_tmp_socks_proxy" ];then
+                    tunnel_port_create=$tunnel_port
                   else
-                    let port++
+                    let tunnel_port++
                 fi
               done
           fi
+
+          # make proxychains config if not exist
+          izopen_tmp_socks_proxy="$izopen_tmp_dir/proxychains/$tunnel_port_create.conf"
+          [ ! -e "$izopen_tmp_socks_proxy" ] && echo -e "strict_chain\nquiet_mode\nproxy_dns\n[ProxyList]\nsocks5 127.0.0.1 $tunnel_port_create" > "$izopen_tmp_socks_proxy"
 
 	  # save the current address used port
 	  echo $tunnel_port_create > "$izopen_tmp_socks_address"
