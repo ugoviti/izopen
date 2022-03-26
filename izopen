@@ -186,7 +186,16 @@ helper_rdp() {
       helper_cmd="${helper_cmd_rdp} "${helper_cmd_opts}" ${address}${port}"
       ;;
     xfreerdp)
-      helper_cmd_opts+="${helper_cmd_opts_rdp} +clipboard /kbd:Italian /size:85% /cert-tofu /cert-ignore /log-level:ERROR"
+      # FIXME: this function always use the default keyboard
+      helper_cmd_opts+="${helper_cmd_opts_rdp}"
+      helper_cmd_opts+=" +clipboard /size:85% /cert-tofu /cert-ignore /log-level:ERROR"
+
+      kbd_layout="$(setxkbmap -print | grep xkb_symbols | awk '{print $4}' | awk -F"+" '{print $2}' | awk -F":" '{print $1}')"
+      case "$kbd_layout" in
+        'it(us)') kbd_layout="United States - English" ;;
+      esac
+      [ ! -z "$kbd_layout" ] && helper_cmd_opts+=" /kbd:\"$kbd_layout\""
+      #helper_cmd_opts+=" /audio-mode:0 /microphone:sys:pulse /sound:sys:pulse"
       [ ! -z "$sec" ]      && helper_cmd_opts+=" /sec:$sec"
       [ ! -z "$domain" ]   && helper_cmd_opts+=" /d:'$domain'"
       [ ! -z "$username" ] && helper_cmd_opts+=" /u:'$username'"
