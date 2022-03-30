@@ -171,7 +171,8 @@ helper_rdp() {
     domain=$(echo $frmdata | awk 'BEGIN {FS="|" } { print $1 }')
     address=$(echo $frmdata | awk 'BEGIN {FS="|" } { print $2 }')
     username=$(echo $frmdata | awk 'BEGIN {FS="|" } { print $3 }')
-    password=$(echo $frmdata | awk 'BEGIN {FS="|" } { print $4 }')
+    # escape special characters in password
+    password=$(echo $frmdata | awk 'BEGIN {FS="|" } { print $4 }' | sed 's/[][`~!@#$%^&*()-_=+{}\|;:",<.>/?'"'"']/\\&/g')
     sec=$(echo $frmdata | awk 'BEGIN {FS="|" } { print $5 }')
   fi
 
@@ -192,15 +193,14 @@ helper_rdp() {
 
       kbd_layout="$(setxkbmap -print | grep xkb_symbols | awk '{print $4}' | awk -F"+" '{print $2}' | awk -F":" '{print $1}')"
       case "$kbd_layout" in
-        'it(us)') kbd_layout="United States - English" ;;
+        'it(us)'|'us') kbd_layout="United States - English" ;;
       esac
       [ ! -z "$kbd_layout" ] && helper_cmd_opts+=" /kbd:\"$kbd_layout\""
       #helper_cmd_opts+=" /audio-mode:0 /microphone:sys:pulse /sound:sys:pulse"
       [ ! -z "$sec" ]      && helper_cmd_opts+=" /sec:$sec"
       [ ! -z "$domain" ]   && helper_cmd_opts+=" /d:'$domain'"
       [ ! -z "$username" ] && helper_cmd_opts+=" /u:'$username'"
-      [ ! -z "$password" ] && helper_cmd_opts+=" /p:\"$password\""
-      [   -z "$password" ] && helper_cmd_opts+=" /p:''"
+      [ ! -z "$password" ] && helper_cmd_opts+=" /p:$password" || helper_cmd_opts+=" /p:''"
       [ ! -z "$port" ]     && helper_cmd_opts+=" /port:$port"
 
       helper_cmd="${helper_cmd_rdp} "${helper_cmd_opts}" /v:${address}"
