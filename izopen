@@ -166,14 +166,15 @@ helper_rdp() {
   #username="$(echo "$username" | sed 's/\//\\\\/g')"
 
   if [[ -z "$address" || -z "$username" || -z "$password" || "$username" = "{USERNAME}" || "$password" = "{PASSWORD}" || "$username" = "%7BUSERNAME%7D" || "$password" = "%7BPASSWORD%7D" ]]; then
-    frmdata=$(yad --center --width=300 --title "Connect to remote computer" --focus-field=4 --align=right --form --field="Domain" "$domain" --field="Address" "$address" --field="Username" "$username" --field="Password:H" "$password" --field="Security:CB" 'rdp!tls!^nla!ext' | grep -v "WINDOW DECORATIONS RELOADED")
+    frmdata=$(yad --center --width=300 --title "Connect to remote computer" --focus-field=4 --align=right --form --field="Domain" "$domain" --field="Address" "$address" --field="Username" "$username" --field="Password":H "$password" --field="Security":CB 'rdp!tls!^nla!ext' --field="Admin Console":CHK | grep -v "WINDOW DECORATIONS RELOADED")
     [ $? != 0 ] && exit 1
     domain=$(echo $frmdata | awk 'BEGIN {FS="|" } { print $1 }')
     address=$(echo $frmdata | awk 'BEGIN {FS="|" } { print $2 }')
     username=$(echo $frmdata | awk 'BEGIN {FS="|" } { print $3 }')
     # escape special characters in password
     password=$(echo $frmdata | awk 'BEGIN {FS="|" } { print $4 }' | sed 's/[][`~!@#$%^&*()-_=+{}\|;:",<.>/?'"'"']/\\&/g')
-    sec=$(echo $frmdata | awk 'BEGIN {FS="|" } { print $5 }')
+    security=$(echo $frmdata | awk 'BEGIN {FS="|" } { print $5 }')
+    console=$(echo $frmdata | awk 'BEGIN {FS="|" } { print $6 }')
   fi
 
   case $helper_cmd_rdp in
@@ -197,11 +198,12 @@ helper_rdp() {
       #esac
       #[ ! -z "$kbd_layout" ] && helper_cmd_opts+=" /kbd:\"$kbd_layout\""
       #helper_cmd_opts+=" /audio-mode:0 /microphone:sys:pulse /sound:sys:pulse"
-      [ ! -z "$sec" ]      && helper_cmd_opts+=" /sec:$sec"
       [ ! -z "$domain" ]   && helper_cmd_opts+=" /d:'$domain'"
       [ ! -z "$username" ] && helper_cmd_opts+=" /u:'$username'"
       [ ! -z "$password" ] && helper_cmd_opts+=" /p:$password" || helper_cmd_opts+=" /p:''"
       [ ! -z "$port" ]     && helper_cmd_opts+=" /port:$port"
+      [ ! -z "$security" ] && helper_cmd_opts+=" /sec:$security"
+      [ "$console" = "TRUE" ] && helper_cmd_opts+=" /console"
 
       helper_cmd="${helper_cmd_rdp} "${helper_cmd_opts}" /v:${address}"
       ;;
