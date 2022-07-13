@@ -2,8 +2,8 @@
 ## multi protocol bash script to auto opening given URI and auto creating ssh reverse tunnel socks proxy
 ## very useful to use with KeePassX or any Desktop/Browser Password Manager as secure URI launcher
 ## Written by Ugo Viti <ugo.viti@initzero.it>
-##    date: 20211124
-## version: 2.7
+##    date: 20220713
+## version: 2.8.0
 
 ## features:
 ##    URI handling of: ssh, rdp, vnc, sftp, ftp, http, https, smb and cifs schemas
@@ -44,15 +44,42 @@
 ## find -maxdepth 1 -type f -name "proxychains.*.conf" | while read dir ; do mv "$dir" proxychains/$(echo $dir | cut -d '.' -f 3).conf ; done
 ## find -maxdepth 1 -type f -name "socks_host_*.conf" | while read dir ; do mv "$dir" $(echo $dir | sed 's/socks_host_//') ; done
 
+## helper commands
+#########################################################################
+# default http/s browser
+#: ${helper_cmd_http:="midori"}
+: ${helper_cmd_http:="google-chrome"}
+
+# default rdp connection software
+#: ${helper_cmd_rdp:="rdesktop"}
+#: ${helper_cmd_rdp:="remmina"}
+: ${helper_cmd_rdp:="xfreerdp"}
+
+# dedault terminal software
+# define the command to use based on current desktop environment
+if   [ "$XDG_CURRENT_DESKTOP" = "MATE" ]; then
+    : ${helper_cmd_terminal:="$(gsettings get org.mate.applications-terminal exec | tr -d \')"}
+elif [ "$XDG_CURRENT_DESKTOP" = "GNOME" ]; then
+    : ${helper_cmd_terminal:="$(gsettings get org.gnome.desktop.default-applications.terminal exec | tr -d \')"}
+elif [ "$XDG_CURRENT_DESKTOP" = "KDE" ]; then
+    #helper_cmd_terminal:="$(kreadconfig --file kdeglobals --group General --key TerminalApplication | tr -d \')"}
+    : ${helper_cmd_terminal:="konsole"}
+elif [ "$XDG_CURRENT_DESKTOP" = "XFCE" ]; then
+    : ${helper_cmd_terminal:="exo-open --launch TerminalEmulator"}
+elif [ "$XDG_CURRENT_DESKTOP" = "Pantheon" ]; then
+    : ${helper_cmd_terminal:="exo-open --launch TerminalEmulator"}
+  else
+    : ${helper_cmd_terminal:="xterm"}
+fi
+
+
 ## variables
 #########################################################################
 debug=1 # enable script debug
 
-helper_http_chrome=1		# use google chrome as web browser (this needed because proxychains doens't works with google chrome)
-
-tunnel_create_force=1		# always create the tunnel for every new ssh connection
-tunnel_use_force=1		# always use the tunnel for every opened url
-tunnel_use_force_ssh=0		# always use the tunnel if connecting via ssh
+tunnel_create_force=1  # always create the tunnel for every new ssh connection
+tunnel_use_force=1     # always use the tunnel for every opened url
+tunnel_use_force_ssh=0 # always use the tunnel if connecting via ssh
 
 izopen_tmp_dir="$HOME/.config/izopen"
 izopen_conf_custom="$izopen_tmp_dir/izopen.conf"
@@ -67,23 +94,6 @@ izopen_tmp_socks_port_current="$izopen_tmp_dir/socks_port_current.conf"
 # commands helper functions
 #########################################################################
 helper_ssh() {
-  # define the command to use based on current desktop environment
-  if   [ "$XDG_CURRENT_DESKTOP" = "MATE" ]; then
-    helper_cmd_terminal="$(gsettings get org.mate.applications-terminal exec | tr -d \')"
-  elif [ "$XDG_CURRENT_DESKTOP" = "GNOME" ]; then
-    helper_cmd_terminal="$(gsettings get org.gnome.desktop.default-applications.terminal exec | tr -d \')"
-  elif [ "$XDG_CURRENT_DESKTOP" = "KDE" ]; then
-    #helper_cmd_terminal="$(kreadconfig --file kdeglobals --group General --key TerminalApplication | tr -d \')"
-    helper_cmd_terminal="konsole"
-  elif [ "$XDG_CURRENT_DESKTOP" = "XFCE" ]; then
-    helper_cmd_terminal="exo-open --launch TerminalEmulator"
-  elif [ "$XDG_CURRENT_DESKTOP" = "Pantheon" ]; then
-    #C3d4dm1n24!helper_cmd_terminal="io.elementary.terminal"
-    helper_cmd_terminal="exo-open --launch TerminalEmulator"
-   else
-    helper_cmd_terminal="xterm"
-  fi
-
   if [ "$tunnel_create" = 1 ]; then
      title="H:$address P:$tunnel_port_create"
    else
@@ -119,12 +129,6 @@ helper_ssh() {
 }
 
 helper_telnet() {
-  helper_cmd_terminal="mate-terminal"
-  #helper_cmd_terminal="terminator"
-  #helper_cmd_terminal="gnome-terminal"
-  #helper_cmd_terminal="konsole"
-  #helper_cmd_terminal="xfce4-terminal"
-
   [ -z "$username" ] && read -p "username: " username;
   #[ -z "$password" ] && read -p "password: " password;
   
@@ -141,42 +145,44 @@ helper_telnet() {
 
 
 helper_rdp() {
-  #helper_cmd_rdp="rdesktop"
-  helper_cmd_rdp="xfreerdp"
+  case $helper_cmd_rdp in
+    rdesktop|xfreerdp)
+      # extract windows domain from username and convert to the right name
+      if [ ! -z $(echo "$username" | grep "@") ]; then
+        domain="$(echo "$username" | awk -F"@" '{print $2}')"
+        username="$(echo "$username" | awk -F"@" '{print $1}')"
+      fi
 
-  # extract windows domain from username and convert to the right name
-  if [ ! -z $(echo "$username" | grep "@") ]; then
-    domain="$(echo "$username" | awk -F"@" '{print $2}')"
-    username="$(echo "$username" | awk -F"@" '{print $1}')"
-  fi
+      if [ ! -z $(echo "$username" | grep "/") ]; then
+        domain="$(echo "$username" | awk -F"/" '{print $1}')"
+        username="$(echo "$username" | awk -F"/" '{print $2}')"
+      fi
 
-  if [ ! -z $(echo "$username" | grep "/") ]; then
-    domain="$(echo "$username" | awk -F"/" '{print $1}')"
-    username="$(echo "$username" | awk -F"/" '{print $2}')"
-  fi
+      # FIXME
+      #password="$(echo "$password" | sed -e 's/%\([A-Z]\)/%\L\1/')" # keepassxc bug workaround: after the '%' char, keepassxc convert to uppercase the following char
+      password="$(echo -e -n "$password" | sed 's/\%25/\%/g' | sed -e 's/%\([A-Z]\)/%\L\1/')" # keepassxc bug workaround: after the '%' char, keepassxc convert to uppercase the following char
 
-  # FIXME
-  #password="$(echo "$password" | sed -e 's/%\([A-Z]\)/%\L\1/')" # keepassxc bug workaround: after the '%' char, keepassxc convert to uppercase the following char
-  password="$(echo -e -n "$password" | sed 's/\%25/\%/g' | sed -e 's/%\([A-Z]\)/%\L\1/')" # keepassxc bug workaround: after the '%' char, keepassxc convert to uppercase the following char
+      # special characters in password like ',!
+      password="$(echo -e -n "$password" | sed -e "s/'/\\\'/g" -e "s/!/\\\!/g")"
 
-  # special characters in password like ',!
-  password="$(echo -e -n "$password" | sed -e "s/'/\\\'/g" -e "s/!/\\\!/g")"
+      #[ -z "$username" ] && username=$domain && unset domain
+      #username="$(echo "$username" | sed 's/\//\\\\/g')"
 
-  #[ -z "$username" ] && username=$domain && unset domain
-  #username="$(echo "$username" | sed 's/\//\\\\/g')"
-
-  if [[ -z "$address" || -z "$username" || -z "$password" || "$username" = "{USERNAME}" || "$password" = "{PASSWORD}" || "$username" = "%7BUSERNAME%7D" || "$password" = "%7BPASSWORD%7D" ]]; then
-    frmdata=$(yad --center --width=300 --title "Connect to remote computer" --focus-field=4 --align=right --form --field="Domain" "$domain" --field="Address" "$address" --field="Username" "$username" --field="Password":H "$password" --field="Security":CB 'rdp!tls!^nla!ext' --field="Admin Console":CHK | grep -v "WINDOW DECORATIONS RELOADED")
-    [ $? != 0 ] && exit 1
-    domain=$(echo $frmdata | awk 'BEGIN {FS="|" } { print $1 }')
-    address=$(echo $frmdata | awk 'BEGIN {FS="|" } { print $2 }')
-    username=$(echo $frmdata | awk 'BEGIN {FS="|" } { print $3 }')
-    # escape special characters in password
-    password=$(echo $frmdata | awk 'BEGIN {FS="|" } { print $4 }' | sed 's/[][`~!@#$%^&*()-_=+{}\|;:",<.>/?'"'"']/\\&/g')
-    security=$(echo $frmdata | awk 'BEGIN {FS="|" } { print $5 }')
-    console=$(echo $frmdata | awk 'BEGIN {FS="|" } { print $6 }')
-  fi
-
+      if [[ -z "$address" || -z "$username" || -z "$password" || "$username" = "{USERNAME}" || "$password" = "{PASSWORD}" || "$username" = "%7BUSERNAME%7D" || "$password" = "%7BPASSWORD%7D" ]]; then
+        frmdata=$(yad --center --width=300 --title "Connect to remote computer" --focus-field=4 --align=right --form --field="Domain" "$domain" --field="Address" "$address" --field="Username" "$username" --field="Password":H "$password" --field="Security":CB 'rdp!tls!^nla!ext' --field="Admin Console":CHK | grep -v "WINDOW DECORATIONS RELOADED")
+        [ $? != 0 ] && exit 1
+        domain=$(echo $frmdata | awk 'BEGIN {FS="|" } { print $1 }')
+        address=$(echo $frmdata | awk 'BEGIN {FS="|" } { print $2 }')
+        username=$(echo $frmdata | awk 'BEGIN {FS="|" } { print $3 }')
+        # escape special characters in password
+        password=$(echo $frmdata | awk 'BEGIN {FS="|" } { print $4 }' | sed 's/[][`~!@#$%^&*()-_=+{}\|;:",<.>/?'"'"']/\\&/g')
+        security=$(echo $frmdata | awk 'BEGIN {FS="|" } { print $5 }')
+        console=$(echo $frmdata | awk 'BEGIN {FS="|" } { print $6 }')
+      fi
+      ;;
+  esac
+  
+  # run the connection
   case $helper_cmd_rdp in
     rdesktop)
       helper_cmd_opts+="-k it -g 1280x780"
@@ -185,7 +191,7 @@ helper_rdp() {
       [ -n "$password" ] && helper_cmd_opts+=" -p '$password'"
       [ -n "$port" ]     && port=":$port"
 
-      helper_cmd="${helper_cmd_rdp} "${helper_cmd_opts}" ${address}${port}"
+      helper_cmd="${helper_cmd_rdp} ${helper_cmd_opts} ${address}${port}"
       ;;
     xfreerdp)
       # FIXME: this function always use the default keyboard
@@ -205,7 +211,12 @@ helper_rdp() {
       [ ! -z "$security" ] && helper_cmd_opts+=" /sec:$security"
       [ "$console" = "TRUE" ] && helper_cmd_opts+=" /console"
 
-      helper_cmd="${helper_cmd_rdp} "${helper_cmd_opts}" /v:${address}"
+      helper_cmd="${helper_cmd_rdp} ${helper_cmd_opts} /v:${address}"
+      ;;
+    remmina)
+      helper_cmd_opts+="${helper_cmd_opts_rdp}"
+      helper_cmd_opts+=" -c"
+      helper_cmd="${helper_cmd_rdp} ${helper_cmd_opts} ${uri}"
       ;;
   esac
 }
@@ -226,16 +237,30 @@ helper_ftp() {
 }
 
 helper_http() {
-  if [ "$tunnel_use" = 1 ] 
-    then
-	if [ $helper_http_chrome = 1 ] ; then
-	  #helper_cmd="google-chrome --media-cache-size=1 --disk-cache-size=1 --disable-client-side-phishing-detection --disable-gpu --restore-last-session --no-first-run --disable-translate --password-store=basic --user-data-dir=\"$izopen_tmp_dir/google-chrome-$tunnel_port_current\" --proxy-server=\"socks5://localhost:$tunnel_port_current\" \"$args\""
-	  helper_cmd="google-chrome --aggressive-cache-discard --disable-notifications --enable-aggressive-domstorage-flushing --disable-client-side-phishing-detection --disable-gpu --restore-last-session --no-first-run --disable-translate --password-store=basic --user-data-dir=\"$izopen_tmp_dir/google-chrome/$tunnel_port_current\" --proxy-server=\"socks5://localhost:$tunnel_port_current\" $helper_cmd_opts_http \"$args\""
-	else
-	  helper_cmd="midori -c \"$izopen_tmp_dir/midori-$tunnel_port_current\" \"$args\""
-	fi
-#    else
-#	helper_cmd="xdg-open \"$args\""
+  # open the browser only on tunnel connection otherwise exit
+  if [ $tunnel_use = 1 ]; then
+  # run the connection
+  case $helper_cmd_http in
+    google-chrome)
+	helper_cmd_opts+=" ${helper_cmd_opts_http}"
+	helper_cmd_opts+=" --aggressive-cache-discard"
+	helper_cmd_opts+=" --disable-notifications"
+	helper_cmd_opts+=" --enable-aggressive-domstorage-flushing"
+	helper_cmd_opts+=" --disable-client-side-phishing-detection"
+	helper_cmd_opts+=" --disable-gpu"
+	helper_cmd_opts+=" --restore-last-session"
+	helper_cmd_opts+=" --no-first-run"
+	helper_cmd_opts+=" --disable-translate"
+	helper_cmd_opts+=" --password-store=basic"
+	helper_cmd="google-chrome --user-data-dir=\"$izopen_tmp_dir/google-chrome/$tunnel_port_current\" --proxy-server=\"socks5://localhost:$tunnel_port_current\" $helper_cmd_opts \"$args\""
+	;;
+    midori)
+	helper_cmd="midori -c \"$izopen_tmp_dir/midori-$tunnel_port_current\" \"$args\""
+	;;
+    *)
+	helper_cmd="xdg-open \"$args\""
+	;;
+  esac
   fi
 }
 
@@ -341,8 +366,8 @@ helper_tunnel() {
  # create the proxychains4 config
  if [[ $tunnel_use = 1 && ! -z $tunnel_port_current && $tunnel_port_current =~ ^-?[0-9]+$ && $tunnel_port_current -ge $tunnel_port_min && $tunnel_port_current -le $tunnel_port_max ]]
   then
-        # proxychains configuration
-        helper_cmd_prepend="proxychains4 -f $izopen_tmp_dir/proxychains/$tunnel_port_current.conf "
+    # proxychains configuration
+    helper_cmd_prepend="proxychains4 -f $izopen_tmp_dir/proxychains/$tunnel_port_current.conf "
 #  else
 #    [ ! -z $tunnel_port_current ] && yad --center --error --text="La porta specificata non è valida: $tunnel_port_current\n\nInserire una porta compresa fra $tunnel_port_min e $tunnel_port_max" 2>/dev/null && unset tunnel_port_current
  fi
@@ -388,7 +413,7 @@ open_uri() {
 		# obtain commands to use to connect
 		helper_${schema} "$args"
 		# because google chrome doesn't works with proxychains, I don't use it
-		if [[ "$schema" = "http" && $helper_http_chrome = 1 ]]; then
+		if [[ "$schema" = "http" && "$helper_cmd_http" = "google-chrome" ]]; then
 		  helper_cmd="$helper_cmd"
 		else
 		  helper_cmd="${helper_cmd_prepend}${helper_cmd}"
@@ -404,66 +429,6 @@ open_uri() {
 		echo "ERROR: invalid URI specified: $args"
 		;;
   esac
-}
-
-
-#
-# URI parsing function
-#
-# The function creates global variables with the parsed results.
-# It returns 0 if parsing was successful or non-zero otherwise.
-#
-# [schema://][user[:password]@]address[:port][/path][?[arg1=val1]...][#fragment]
-#
-# from http://vpalos.com/537/uri-parsing-using-bash-built-in-features/
-#
-function uri_parser2() {
-    # uri capture
-    uri="$@"
-
-    # safe escaping
-    uri="${uri//\`/%60}"
-    uri="${uri//\"/%22}"
-
-    # top level parsing
-    pattern='^(([a-z]{3,5})://)?((([^:\/]+)(:([^@\/]*))?@)?([^:\/?]*)(:([0-9]+))?)(\/[^?]*)?(\?[^#]*)?(#.*)?$'
-    [[ "$uri" =~ $pattern ]] || return 1;
-
-    # component extraction
-    uri=${BASH_REMATCH[0]}
-    schema=${BASH_REMATCH[2]}
-    address=${BASH_REMATCH[3]}
-    username=${BASH_REMATCH[5]}
-    password=${BASH_REMATCH[7]}
-    address=${BASH_REMATCH[8]}
-    port=${BASH_REMATCH[10]}
-    path=${BASH_REMATCH[11]}
-    query=${BASH_REMATCH[12]}
-    fragment=${BASH_REMATCH[13]}
-
-    # path parsing
-    count=0
-    path="$uri_path"
-    pattern='^/+([^/]+)'
-    while [[ $path =~ $pattern ]]; do
-        eval "uri_parts[$count]=\"${BASH_REMATCH[1]}\""
-        path="${path:${#BASH_REMATCH[0]}}"
-        let count++
-    done
-
-    # query parsing
-    count=0
-    query="$uri_query"
-    pattern='^[?&]+([^= ]+)(=([^&]*))?'
-    while [[ $query =~ $pattern ]]; do
-        eval "uri_args[$count]=\"${BASH_REMATCH[1]}\""
-        eval "uri_arg_${BASH_REMATCH[1]}=\"${BASH_REMATCH[3]}\""
-        query="${query:${#BASH_REMATCH[0]}}"
-        let count++
-    done
-
-    # return success
-    return 0
 }
 
 
@@ -573,4 +538,3 @@ case $1 in
 	open_uri "$@" 2>&1 | tee -a /tmp/izopen.log 2>&1
 	;;
 esac
-
