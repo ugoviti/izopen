@@ -137,19 +137,22 @@ function helper_terminal() {
 function helper_ssh() {
   helper_terminal
 
-  [ -z "$username" ] && read -p "username: " username;
+  #[ -z "$username" ] && read -p "username: " username;
   #[ -z "$password" ] && read -p "password: " password;
   
   # manage non mandatory cmd options
   helper_cmd_opts="${helper_cmd_opts_ssh}"  
-  helper_cmd_opts+=" -C $username@$host"
-  [ -n "$port" ] && helper_cmd_opts+=" -p $port"
-
+  # add username, otherwise use the current logged in user
+  [ ! -z "$username" ] && helper_cmd_opts+=" $username@$host" || helper_cmd_opts+=" $host"
+  # add the port if not default 22
+  [ ! -z "$port" ] && helper_cmd_opts+=" -p $port"
+  # enable compression
+  helper_cmd_opts+=" -C"
   # if tunnel_create=1 add ssh options to create socks tunnel and compression
   [ "$tunnel_create" = 1 ] && helper_cmd_opts+=" -D $tunnel_port_create"
   
   # set the final command
-  helper_cmd="${helper_cmd_terminal} $helper_cmd_opts_terminal -e \"${helper_cmd_prepend}ssh $helper_cmd_opts\""
+  helper_cmd="${helper_cmd_terminal} $helper_cmd_opts_terminal -e \"${helper_cmd_prepend}ssh${helper_cmd_opts}\""
 
   #######
   ## TEST
@@ -171,7 +174,7 @@ function helper_telnet() {
   [ -n "$port" ] && helper_cmd_opts+=" $port"
 
   # set the final command
-  helper_cmd="${helper_cmd_terminal} $helper_cmd_opts_terminal -e \"${helper_cmd_prepend}telnet $helper_cmd_opts\""
+  helper_cmd="${helper_cmd_terminal} $helper_cmd_opts_terminal -e \"${helper_cmd_prepend}telnet${helper_cmd_opts}\""
 }
 
 function helper_http() {
