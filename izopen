@@ -4,17 +4,17 @@ DESCRIPTION="multi protocol bash script to auto opening given URI and auto creat
 VERSION="3.0.0"
 VERSION_DATE="20220714"
 
-## very useful to use with KeePassX or any Desktop/Browser Password Manager as secure URI launcher
+## izOpen is very useful to use with KeePassX or any Desktop/Browser Password Manager as secure URI launcher
 ## written by Ugo Viti <ugo.viti@initzero.it>
 
-## features:
+## Features:
 ## supported URI schemas: ssh, rdp, vnc, sftp, ftp, http, https, smb, cifs
 
-### installation:
+### Installation:
 ## simply copy this script into a user or system wide bin directory (suggestion: cp izopen ~/bin), must be into a PATH variable, and install the following system commands:
 ## dnf install -y yad kdelibs3 xfreerdp proxychains-ng keepassxc
 
-## custom config:
+## Custom config:
 ## you can customize internal variables modifying the '$HOME/.config/izopen/izopen.conf' file (automatically created on first run)
 
 ### NOTE:
@@ -59,7 +59,6 @@ elif [ "$XDG_CURRENT_DESKTOP" = "Pantheon" ]; then
     : ${helper_cmd_terminal:="xterm"}
 fi
 
-
 ## variables
 #########################################################################
 : ${debug:=0}                # enable script debug
@@ -98,8 +97,8 @@ izopen_log_file="$izopen_conf_dir/izopen.log"
 function make_default_config() {
   cat <<EOF
 ## terminal options
-#helper_cmd_terminal:="konsole"
-#helper_cmd_opts_terminal+=" --noclose"
+#helper_cmd_terminal="konsole"
+#helper_cmd_opts_terminal=" --noclose"
 
 # ssh options
 #helper_cmd_opts_ssh=" -z"
@@ -121,19 +120,19 @@ EOF
 
 function helper_terminal() {
   if [ "$tunnel_create" = 1 ]; then
-     title="H:$host P:$tunnel_port_create"
+     title="H:$host P:$tunnel_port_create [MASTER]"
    else
-     title="H:$host"
+     title="H:$host P:$tunnel_port_create [SLAVE]"
   fi
 
   case $helper_cmd_terminal in
     konsole)
-      #helper_cmd_opts_terminal+=" --noclose"
-      helper_cmd_opts_terminal+=" -p tabtitle='(%u) %H'"
+      helper_cmd_opts_terminal="-p tabtitle='(%u) %H'"
       helper_cmd_opts_terminal+=" -p RemoteTabTitleFormat='$title'"
+      #helper_cmd_opts_terminal+=" --noclose"
       ;;
     *)
-      helper_cmd_opts_terminal+=" --title \"$title\""
+      helper_cmd_opts_terminal="--title \"$title\""
       ;;
   esac
 }
@@ -145,10 +144,13 @@ function helper_ssh() {
   #[ -z "$password" ] && read -p "password: " password;
   
   # manage non mandatory cmd options
-  helper_cmd_opts+=" ${helper_cmd_opts_ssh}"
+  helper_cmd_opts="${helper_cmd_opts_ssh}"  
   helper_cmd_opts+=" -C $username@$host"
-  [ -n "$port" ] && helper_cmd_opts+=" -p $port "
+  [ -n "$port" ] && helper_cmd_opts+=" -p $port"
 
+  # if tunnel_create=1 add ssh options to create socks tunnel and compression
+  [ "$tunnel_create" = 1 ] && helper_cmd_opts+=" -D $tunnel_port_create"
+  
   # set the final command
   helper_cmd="${helper_cmd_terminal} $helper_cmd_opts_terminal -e \"${helper_cmd_prepend}ssh $helper_cmd_opts\""
 
@@ -167,7 +169,7 @@ function helper_telnet() {
   #[ -z "$password" ] && read -p "password: " password;
   
   # manage non mandatory cmd options
-  helper_cmd_opts+=" ${helper_cmd_opts_telnet}"
+  helper_cmd_opts="${helper_cmd_opts_telnet}"
   helper_cmd_opts+=" $host"
   [ -n "$port" ] && helper_cmd_opts+=" $port "
 
@@ -183,7 +185,7 @@ function helper_http() {
     # run the connection
     case $helper_cmd_http in
       google-chrome)
-        helper_cmd_opts+=" ${helper_cmd_opts_http}"
+        helper_cmd_opts="${helper_cmd_opts_http}"
         helper_cmd_opts+=" --aggressive-cache-discard"
         helper_cmd_opts+=" --disable-notifications"
         helper_cmd_opts+=" --enable-aggressive-domstorage-flushing"
@@ -200,10 +202,12 @@ function helper_http() {
         helper_cmd="google-chrome --user-data-dir=\"$izopen_conf_dir/google-chrome/$tunnel_port_use\" --proxy-server=\"socks5://localhost:$tunnel_port_use\" $helper_cmd_opts \"$args\""
         ;;
       midori)
-        helper_cmd="${helper_cmd_prepend}midori -c \"$izopen_conf_dir/midori-$tunnel_port_use\" \"$args\""
+        helper_cmd_opts="${helper_cmd_opts_http}"
+        helper_cmd="${helper_cmd_prepend}midori -c \"$izopen_conf_dir/midori/$tunnel_port_use\" $helper_cmd_opts \"$args\""
         ;;
       *)
-        helper_cmd="${helper_cmd_prepend}xdg-open \"$args\""
+        helper_cmd_opts="${helper_cmd_opts_http}"
+        helper_cmd="${helper_cmd_prepend}xdg-open $helper_cmd_opts \"$args\""
         ;;
     esac
   fi
@@ -248,10 +252,12 @@ function helper_rdp() {
       ;;
   esac
   
+  # manage non mandatory cmd options
+  helper_cmd_opts="${helper_cmd_opts_rdp}"
+  
   # run the connection
   case $helper_cmd_rdp in
     rdesktop)
-      helper_cmd_opts+=" ${helper_cmd_opts_rdp}"
       helper_cmd_opts+=" -k it -g 1280x780"
       [ -n "$domain" ]   && helper_cmd_opts+=" -d '$domain'"
       [ -n "$username" ] && helper_cmd_opts+=" -u '$username'"
@@ -262,7 +268,6 @@ function helper_rdp() {
       ;;
     xfreerdp)
       # FIXME: this function always use the default keyboard
-      helper_cmd_opts+=" ${helper_cmd_opts_rdp}"
       helper_cmd_opts+=" +clipboard /size:85% /cert-tofu /cert-ignore /log-level:ERROR"
 
       #kbd_layout="$(setxkbmap -print | grep xkb_symbols | awk '{print $4}' | awk -F"+" '{print $2}' | awk -F":" '{print $1}')"
@@ -281,7 +286,6 @@ function helper_rdp() {
       helper_cmd="${helper_cmd_prepend}xfreerdp ${helper_cmd_opts} /v:${host}"
       ;;
     remmina)
-      helper_cmd_opts+="${helper_cmd_opts_rdp}"
       helper_cmd_opts+=" -c"
       helper_cmd="${helper_cmd_prepend}remmina ${helper_cmd_opts} ${uri}"
       ;;
@@ -289,6 +293,9 @@ function helper_rdp() {
 }
 
 function helper_vnc() {
+  # manage non mandatory cmd options
+  helper_cmd_opts="${helper_cmd_opts_vnc}"
+  
   # vnc doesn't support username and actually don't accept the password. use the gnome keyring instead for this
   #helper_cmd="vinagre $schema://$host$([ -n $port ] && echo ":$port")"
   [ -n $port ] && helper_cmd_opts+=":$port"
@@ -320,7 +327,6 @@ function helper_cifs() {
   helper_cmd="${helper_cmd_prepend}xdg-open \"$args\""
 }
 
-
 # SYSTEM FUNCTIONS
 # DON'T TOUCH ANYTHING BELLOW
 #########################################################################
@@ -340,14 +346,14 @@ function helper_tunnel_create() {
     [ $? != 0 ] && tunnel_create=1 || tunnel_create=0
  fi
 
-# manage the proxychains tunnel configuration
- if [ "$tunnel_create" = 1 ]
-  then
     # import port configuration of remote address if exist
     if [ -e "$izopen_conf_socks_address" ] ; then 
       tunnel_port_create="$(cat "$izopen_conf_socks_address")"
     fi
-
+ 
+# manage the proxychains tunnel configuration
+ if [ "$tunnel_create" = 1 ]
+  then
     if [ ! -e "$izopen_conf_socks_address" ] ; then
         # find first free usable port
         local tunnel_port
@@ -377,15 +383,11 @@ tcp_connect_time_out 8000
 socks5 127.0.0.1 $tunnel_port_create" > "$izopen_conf_socks_proxy"
     fi
 
-    # save the current address used port
+    # save the current used port for the specified host
     echo $tunnel_port_create > "$izopen_conf_socks_address"
 
     # save the last used/reused port
     echo $tunnel_port_create > "$izopen_conf_socks_port_current"
-
-    # dynamic port forwarding with compression
-    # add ssh options to create socks tunnel and compression
-    helper_cmd_opts+="-D $tunnel_port_create "
  fi
 }
 
