@@ -172,15 +172,16 @@ helper_telnet() {
 helper_rdp() {
   case $helper_cmd_rdp in
     rdesktop|xfreerdp)
-      # extract windows domain from username and convert to the right name
-      if [ ! -z $(echo "$username" | grep "@") ]; then
-        domain="$(echo "$username" | awk -F"@" '{print $2}')"
-        username="$(echo "$username" | awk -F"@" '{print $1}')"
-      fi
-
+      ## extract windows domain from username and convert to the right name
+      # using / or \ as domain separator the domain is the first argument
       if [ ! -z $(echo "$username" | grep "/") ]; then
         domain="$(echo "$username" | awk -F"/" '{print $1}')"
         username="$(echo "$username" | awk -F"/" '{print $2}')"
+      fi
+      # using @ as domain separator the domain is the second argument
+      if [ ! -z $(echo "$username" | grep "@") ]; then
+        domain="$(echo "$username" | awk -F"@" '{print $2}')"
+        username="$(echo "$username" | awk -F"@" '{print $1}')"
       fi
 
       # FIXME: @20220714 still needed? commenting
@@ -434,12 +435,12 @@ open_uri() {
   
   # parse the uri
   uri_parser $uri
-  local schema=$uri_schema
-  local username=$uri_username
-  local password=$uri_password
-  local host=$uri_host
-  local port=$uri_port
-  local path=$uri_path
+#   local schema=$uri_schema
+#   local username=$uri_username
+#   local password=$uri_password
+#   local host=$uri_host
+#   local port=$uri_port
+#   local path=$uri_path
   # for safety logging create a new uri variable without the password
   [ -z "$password" ] && local uri_safe=$uri || local uri_safe="$(echo "$uri" | sed "s/:$password//g")"
   uri_unset
@@ -476,6 +477,76 @@ open_uri() {
   esac
 }
 
+#      desc: set/check/sanitize/validate a URI and the gained variables
+#      args: $1
+# args desc: 'URI'
+#    return: misc variables containing the URI data
+uri_parser() {
+    # uri capture
+    uri="$@"
+    # safe escaping
+    uri="${uri//\`/%60}"
+    uri="${uri//\"/%22}"
+    local query1 query2 path1 path2
+    # extract the schema
+    protourl="$(echo $uri | grep :// | sed -e's,^\(.*://\).*,\1,g')"
+    schema="$(echo $protourl | cut -d":" -f1 )"
+    if [[ ! -z $schema ]] ; then
+      # remove the schema
+      url="$(echo ${1/$protourl/})"
+      # since kde plasma 5.16 there is a bug when specifing extra port that add ?line=PORT&column=0
+      url="$(echo $url | sed 's/?line=/:/' | sed 's/&column=0//')"
+      # extract the user (if any)
+      login="$(echo $url | grep @ | cut -d@ -f1)"
+      username="$(echo $login | cut -d: -f1)"
+      password="$(echo $login | grep : | cut -d: -f2)"
+      password="$(echo "$password" | sed 's/!/\\!/g' | sed 's/'\''/\\'\''/g')"
+      # extract the host
+      port="$(echo ${url/"$login"@/} | cut -d/ -f1)"
+      host="$(echo ${port} | cut -d: -f1)"
+      # by request - try to extract the port
+      port="$(echo $port | grep ":" | sed -e 's,^.*:,:,g' -e 's,.*:\([0-9]*\).*,\1,g' -e 's,[^0-9],,g')"
+      # extract the uri (if any)
+      resource="/$(echo $url | grep / | cut -d/ -f2-)"
+    else
+      url=""
+      login=""
+      username=""
+      password=""
+      host=""
+      port=""
+      resource=$1
+    fi
+    # extract the path (if any)
+    path1="$(echo $resource | grep ? | cut -d? -f1 )"
+    path2="$(echo $resource | grep \# | cut -d# -f1 )"
+    path=$path1
+    if [[ -z $path ]] ; then path=$path2 ; fi
+    if [[ -z $path ]] ; then path=$resource ; fi
+    # extract the query (if any)
+    query1="$(echo $resource | grep ? | cut -d? -f2-)"
+    query2="$(echo $query1 | grep \# | cut -d\# -f1 )"
+    query=$query2
+    if [[ -z $query ]] ; then query=$query1 ; fi
+    # extract the fragment (if any)
+    fragment="$(echo $resource | grep \# | cut -d\# -f2 )"
+    url="$protourl$url"
+    if [ $debug = 2 ]; then
+      echo "url: $url"
+      echo "  schema: $schema"
+      echo "   login: $login"
+      echo "username: $username"
+      echo "password: $password"
+      echo "    host: $host"
+      echo "    port: $port"
+      echo "resource: $resource"
+      echo "    path: $path"
+      echo "   query: $query"
+      echo "fragment: $fragment"
+      echo ""
+    fi
+}
+
 #
 # URI parsing function
 #
@@ -485,7 +556,7 @@ open_uri() {
 # [schema://][user[:password]@]host[:port][/path][?[arg1=val1]...][#fragment]
 #
 # thanks to: https://wp.vpalos.com/537/uri-parsing-using-bash-built-in-features/
-function uri_parser() {
+function uri_parserTEST() {
     # uri capture
     uri="$@"
 
