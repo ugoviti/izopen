@@ -10,26 +10,14 @@ VERSION_DATE="20220714"
 ## features:
 ##    URI handling of: ssh, rdp, vnc, sftp, ftp, http, https, smb and cifs schemas
 
-## installation:
-##        simply copy this script into a user or system wide bin directory (suggestion: cp izopen ~/bin), must be into a PATH variable
+### installation:
+## simply copy this script into a user or system wide bin directory (suggestion: cp izopen ~/bin), must be into a PATH variable, and install the following commands:
+## dnf install -y yad kdelibs3 xfreerdp proxychains-ng keepassxc
 
 ## custom config:
-## create a new ascii file into $HOME/.config/izopen/izopen.conf
-## examples:
-# helper_cmd_opts_http="--proxy-bypass-list='<-loopback>'"
-# helper_cmd_opts_rdp="/drive:share,$HOME/share"
-# nc_opts="-z"
+## you can customize internal variables modifying the '$HOME/.config/izopen/izopen.conf' file (automatically created on first run)
 
-## usage: izopen uri://username:password@address:port
-
-## examples:
-##        izopen http://www.example.com
-##        izopen http://john:doe@www.example.com
-##        izopen ssh://root:supersecurepassword@www.example.com
-##        izopen smb://Administrator:password@server
-##        izopen rdp://DOMAIN/Administrator:password@server
-##        izopen rdp:///Administrator:password@server
-
+###NOTES
 ## KeePassX 0.x integration:
 ##        into advanded settings of keepassx select "Custom Browser Command" and insert:
 ##        izopen %1
@@ -39,12 +27,6 @@ VERSION_DATE="20220714"
 ## KeePassX 2.x integration (Fedora >= 23):
 ##        dnf install -y yad kdelibs3 proxychains-ng keepassx
 
-### UPGRADE COMMANDS for release after 20210918:
-## cd $HOME/.config/izopen
-## mkdir -p $HOME/.config/izopen/{google-chrome,proxychains}
-## find -maxdepth 1 -type d -name "google-chrome-*" | while read dir ; do mv "$dir" google-chrome/$(echo $dir | cut -d '-' -f 3) ; done
-## find -maxdepth 1 -type f -name "proxychains.*.conf" | while read dir ; do mv "$dir" proxychains/$(echo $dir | cut -d '.' -f 3).conf ; done
-## find -maxdepth 1 -type f -name "socks_host_*.conf" | while read dir ; do mv "$dir" $(echo $dir | sed 's/socks_host_//') ; done
 
 ## helper commands
 #########################################################################
@@ -556,6 +538,20 @@ function uri_unset() {
   unset uri uri_schema uri_address uri_username uri_password uri_host uri_port uri_path uri_query uri_fragment count query pattern
 }
 
+function confirm () {
+    # call with a prompt string or use a default
+    read -r -p "${1:-Are you sure? [y/N]} " -n 1 response
+    case $response in
+        [yY][eE][sS]|[yY])
+            echo
+            true
+            ;;
+        *)
+            echo
+            false
+            ;;
+    esac
+}
 
 ###################################################################
 #################### default program menu and arguments validations
@@ -563,31 +559,45 @@ function uri_unset() {
 
 # usage help menu
 function _usage()  {
+  _prog=$( echo ${0##*/} )
   cat <<EOF
 $NAME - $DESCRIPTION
 written by Ugo Viti <ugo.viti@initzero.it>
 version: $VERSION - release: $VERSION_DATE
 
-Usage: $0 [options] URI
+Usage: $_prog [options] URI
 
 Options:
   -h, --help             Show help options
   -d, --debug            Enable debug (default: $debug)
-  -u, --uri              Specify the URI to open
+  -u, --uri              Specify the URI to open (you can also specify the URL as last argument without this option)
   -t, --tunnel           Open the http browser using an already estabilished ssh tunnel (default: $tunnel_use)
+  --mkconfig             Create default config file, overwriting it if already exist (default location: $izopen_conf_file)
 
 Examples:
-  # open https website
-  $ $0 https://www.google.com
-
-  # open ssh connection on port 222
-  $ $0 ssh://root@192.168.1.1:222
-
-  # open a http browser using an already connected ssh tunnel
-  $ $0 -t
+  # general usage:
+  $ $_prog uri://username:password@address:port
   
-  # open rdp connection
-  $ $0 rdp://Administrator:s3cur3Passw0Rd@192.168.1.1:33189
+  # open a http web page:
+  $ $_prog http://www.example.com
+  
+  # open a http web page specifing username and password:
+  $ $_prog http://john:doe@www.example.com
+  
+  # open a ssh connection specifing username and port:
+  $ $_prog ssh://root@secure.example.com:222
+  
+  # open a rdp connection specifing username and password:
+  $ $_prog rdp:///Administrator:password@server
+  
+  # open a rdp connection specifing domain, username and password and port:
+  $ $_prog rdp://DOMAIN/Administrator:password@server:33189
+  
+  # open a smb file share with default file manager:
+  $ $_prog smb://Administrator:password@server
+  
+  #open a http browser using an already connected ssh tunnel:
+  $ $_prog -t
 EOF
 }
 
@@ -595,8 +605,8 @@ EOF
 [ $# = 0 ] && _usage && exit 1
 
 # define command short and long options
-_optionsShort="u:dth"
-_optionsLong="uri:,debug,tunnel,help"
+_optionsShort="hu:dt"
+_optionsLong="help,uri:,debug,tunnel,mkconfig"
 
 # options may be followed by one colon to indicate they have a required argument
 if ! options=$(getopt -o $_optionsShort -l $_optionsLong -- "$@"); then
@@ -609,13 +619,6 @@ eval set -- "$options"
 
 while [ $# -gt 0 ]; do
   case "$1" in
-    -d|--debug)
-      debug="1"
-      ;;
-    -t|--tunnel)
-      tunnel_create=1
-      tunnel_use=1
-      ;;
     -h|--help)
       _usage
       exit 1
@@ -624,6 +627,21 @@ while [ $# -gt 0 ]; do
       # for options with required arguments, an additional shift is required
       shift
       uri="$1"
+      ;;
+    -d|--debug)
+      debug="1"
+      ;;
+    -t|--tunnel)
+      tunnel_create=1
+      tunnel_use=1
+      ;;
+    --mkconfig)
+      if [ -e "$izopen_conf_file" ]; then
+          confirm "WARNING: you are replacing the previous config file: $izopen_conf_file - Are you sure? [y/N]:" && make_default_config > "$izopen_conf_file"
+        else
+          make_default_config > "$izopen_conf_file"
+      fi
+      exit $?
       ;;
     (--) shift; break;;
     (-*) echo "ERROR: unrecognized option: '$1'" 1>&2; exit 1;;
