@@ -86,9 +86,6 @@ izopen_conf_proxychains_dir="$izopen_conf_dir/proxychains"
 # izopen log file
 izopen_log_file="$izopen_conf_dir/izopen.log"
 
-# read the latest tunnel port used
-[ -e "$izopen_conf_socks_port_current" ] && tunnel_port_use="$(cat "$izopen_conf_socks_port_current")"
-
 # import configuration from izopen.conf if exist and override default script variables
 [ -f "${izopen_conf_file}" ] && source "${izopen_conf_file}"
 
@@ -171,21 +168,21 @@ function helper_telnet() {
   # manage non mandatory cmd options
   helper_cmd_opts="${helper_cmd_opts_telnet}"
   helper_cmd_opts+=" $host"
-  [ -n "$port" ] && helper_cmd_opts+=" $port "
+  [ -n "$port" ] && helper_cmd_opts+=" $port"
 
   # set the final command
   helper_cmd="${helper_cmd_terminal} $helper_cmd_opts_terminal -e \"${helper_cmd_prepend}telnet $helper_cmd_opts\""
-  
-  helper_cmd="${helper_cmd_terminal} --title \"$([ "$tunnel_create" = 1 ] && echo "H:$host P:$tunnel_port_create" || echo "H:$host")\" -e \"${helper_cmd_prepend}telnet $helper_cmd_opts\""
 }
 
 function helper_http() {
-  # open the browser only on tunnel connection otherwise exit
-  if [ $tunnel_use = 1 ]; then
-    # run the connection
-    case $helper_cmd_http in
-      google-chrome)
-        helper_cmd_opts="${helper_cmd_opts_http}"
+  # manage non mandatory cmd options
+  helper_cmd_opts="${helper_cmd_opts_http}"
+  
+  # run the connection
+  case $helper_cmd_http in
+    google-chrome)
+      # open the browser with this options only on tunnel connection
+      if [ $tunnel_use = 1 ]; then
         helper_cmd_opts+=" --aggressive-cache-discard"
         helper_cmd_opts+=" --disable-notifications"
         helper_cmd_opts+=" --enable-aggressive-domstorage-flushing"
@@ -195,22 +192,22 @@ function helper_http() {
         helper_cmd_opts+=" --no-first-run"
         helper_cmd_opts+=" --disable-translate"
         helper_cmd_opts+=" --password-store=basic"
+        helper_cmd_opts+=" --proxy-server=\"socks5://localhost:$tunnel_port_use\""
+        helper_cmd_opts+=" --user-data-dir=\"$izopen_conf_dir/google-chrome/$tunnel_port_use\""
         
         # because google chrome doesn't works via proxychains wrapper, don't use the $helper_cmd_prepend command
         unset helper_cmd_prepend
-        
-        helper_cmd="google-chrome --user-data-dir=\"$izopen_conf_dir/google-chrome/$tunnel_port_use\" --proxy-server=\"socks5://localhost:$tunnel_port_use\" $helper_cmd_opts \"$args\""
-        ;;
-      midori)
-        helper_cmd_opts="${helper_cmd_opts_http}"
-        helper_cmd="${helper_cmd_prepend}midori -c \"$izopen_conf_dir/midori/$tunnel_port_use\" $helper_cmd_opts \"$args\""
-        ;;
-      *)
-        helper_cmd_opts="${helper_cmd_opts_http}"
-        helper_cmd="${helper_cmd_prepend}xdg-open $helper_cmd_opts \"$args\""
-        ;;
-    esac
-  fi
+      fi
+      
+      helper_cmd="google-chrome $helper_cmd_opts \"$args\""
+      ;;
+    midori)
+      helper_cmd="${helper_cmd_prepend}midori -c \"$izopen_conf_dir/midori/$tunnel_port_use\" $helper_cmd_opts \"$args\""
+      ;;
+    *)
+      helper_cmd="${helper_cmd_prepend}xdg-open $helper_cmd_opts \"$args\""
+      ;;
+  esac
 }
 
 function helper_rdp() {
@@ -392,38 +389,44 @@ socks5 127.0.0.1 $tunnel_port_create" > "$izopen_conf_socks_proxy"
 }
 
 function helper_tunnel_manage() {
- # verify if needed to create the ssh tunnel only if the uri is ssh://
- case ${schema} in
-   ssh)
-       # by default don't use tunnel if the schema is ssh and is not forced
-       [ "$tunnel_use_force_ssh" = 0 ] && tunnel_use=0
-       helper_tunnel_create
-       ;;
- esac
+  # verify if needed to create the ssh tunnel only if the uri is ssh://
+  case ${schema} in
+    ssh)
+        # by default don't use tunnel if the schema is ssh and is not forced
+        [ "$tunnel_use_force_ssh" = 0 ] && tunnel_use=0
+        helper_tunnel_create
+        ;;
+  esac
 
- # ask for a port if we want use a tunnel
- if [ $tunnel_use = 1 ] ; then
-   #tunnel_port_use=$(LANG=C yad --title "izOpen SSH Proxy" --entry --entry-text=$tunnel_port_use --text="Inserire la porta del Proxy Socks \nCompresa fra $tunnel_port_min e $tunnel_port_max\n" 2>/dev/null)
+  # ask for a port if we want use a tunnel
+  if [ $tunnel_use = 1 ] ; then
+    #tunnel_port_use=$(LANG=C yad --title "izOpen SSH Proxy" --entry --entry-text=$tunnel_port_use --text="Inserire la porta del Proxy Socks \nCompresa fra $tunnel_port_min e $tunnel_port_max\n" 2>/dev/null)
 
-   tunnel_port_use=$(LANG=C yad --center --title "izOpen SSH Proxy" --entry --numeric --entry-text=$tunnel_port_use --text="<b>Inserire la porta del Proxy Socks</b> \nCompresa fra $tunnel_port_min e $tunnel_port_max\n" $tunnel_port_min $tunnel_port_max --timeout=10 --timeout-indicator=bottom | tr -d [:alpha:] | tr -d [:cntrl:] | tr -d [:space:])
+    if [[ -e "$izopen_conf_socks_port_current" && -z "$tunnel_port_use" ]]; then
+      # read the latest tunnel port used if not specified
+      tunnel_port_use="$(cat "$izopen_conf_socks_port_current")"
+      
+      # request if we must use the last used port
+      tunnel_port_use=$(LANG=C yad --center --title "izOpen SSH Proxy" --entry --numeric --entry-text=$tunnel_port_use --text="<b>Inserire la porta del Proxy Socks</b> \nCompresa fra $tunnel_port_min e $tunnel_port_max\n" $tunnel_port_min $tunnel_port_max --timeout=10 --timeout-indicator=bottom | tr -d [:alpha:] | tr -d [:cntrl:] | tr -d [:space:])
+    fi 
+    
+    # save the current used port for later usage
+    [ ! -z "$tunnel_port_use" ] && echo $tunnel_port_use > "$izopen_conf_socks_port_current"
+    else
+      tunnel_port_use=""
+  fi
 
-   # save the current used port for later usage
-   [ ! -z "$tunnel_port_use" ] && echo $tunnel_port_use > "$izopen_conf_socks_port_current"
-   else
-     tunnel_port_use=""
- fi
-
- # create the proxychains4 config
- if [[ $tunnel_use = 1 && ! -z $tunnel_port_use && $tunnel_port_use =~ ^-?[0-9]+$ && $tunnel_port_use -ge $tunnel_port_min && $tunnel_port_use -le $tunnel_port_max ]]
+  # create the proxychains4 config
+  if [[ $tunnel_use = 1 && ! -z $tunnel_port_use && $tunnel_port_use =~ ^-?[0-9]+$ && $tunnel_port_use -ge $tunnel_port_min && $tunnel_port_use -le $tunnel_port_max ]]
   then
     # proxychains configuration
     helper_cmd_prepend="proxychains4 -f $izopen_conf_proxychains_dir/$tunnel_port_use.conf "
-#  else
-#    [ ! -z $tunnel_port_use ] && LANG=C yad --center --error --text="La porta specificata non è valida: $tunnel_port_use\n\nInserire una porta compresa fra $tunnel_port_min e $tunnel_port_max" 2>/dev/null && unset tunnel_port_use
- fi
+  #  else
+  #    [ ! -z $tunnel_port_use ] && LANG=C yad --center --error --text="La porta specificata non è valida: $tunnel_port_use\n\nInserire una porta compresa fra $tunnel_port_min e $tunnel_port_max" 2>/dev/null && unset tunnel_port_use
+  fi
 
- # don't use tunnel socks proxy if the port is not specified or wrong
- [ -z $tunnel_port_use ] && tunnel_use=0
+  # don't use tunnel socks proxy if the port is not specified or wrong
+  [ -z $tunnel_port_use ] && tunnel_use=0
 }
 
 function print_log() {
@@ -445,8 +448,8 @@ function print_debug() {
                host: $host
                port: $port
                path: $path
-      tunnel_create: $tunnel_create - tunnel_port_create: $tunnel_port_create
-         tunnel_use: $tunnel_use -    tunnel_port_use: $tunnel_port_use
+      tunnel_create: $tunnel_create - port: $tunnel_port_create
+         tunnel_use: $tunnel_use - port: $tunnel_port_use
  helper_cmd_prepend: $helper_cmd_prepend
                 cmd: $helper_cmd
 EOF
@@ -598,6 +601,7 @@ Options:
   -d, --debug            Enable debug (default: $debug)
   -u, --uri              Specify the URI to open (you can also specify the URL as last argument without this option)
   -t, --tunnel           Force the usage request of an already estabilished ssh tunnel when opening the uri (default: $tunnel_use)
+  -p, --port             Use the specified socks port to connect using reverse tunnel (default: request every time)
   --mkconfig             Create default config file, overwriting it if already exist (default location: $izopen_conf_file)
 
 Examples:
@@ -634,8 +638,8 @@ EOF
 [ $# = 0 ] && _usage && exit 1
 
 # define command short and long options
-_optionsShort="hu:dt"
-_optionsLong="help,uri:,debug,tunnel,mkconfig"
+_optionsShort="hu:dtp:"
+_optionsLong="help,uri:,debug,tunnel,port,mkconfig"
 
 # options may be followed by one colon to indicate they have a required argument
 if ! options=$(getopt -o $_optionsShort -l $_optionsLong -- "$@"); then
@@ -664,6 +668,12 @@ while [ $# -gt 0 ]; do
       # force usage of estabilished tunnel for all uri schema
       tunnel_use_force=1
       tunnel_use_force_ssh=1
+      ;;
+    -p|--port)
+      shift
+      tunnel_use_force=1
+      # use the specified tunnel socks port
+      tunnel_port_use=$1
       ;;
     --mkconfig)
       if [ -e "$izopen_conf_file" ]; then
