@@ -5,19 +5,19 @@ VERSION="3.0.0"
 VERSION_DATE="20220714"
 
 ## very useful to use with KeePassX or any Desktop/Browser Password Manager as secure URI launcher
-## Written by Ugo Viti <ugo.viti@initzero.it>
+## written by Ugo Viti <ugo.viti@initzero.it>
 
 ## features:
-##    URI handling of: ssh, rdp, vnc, sftp, ftp, http, https, smb and cifs schemas
+## supported URI schemas: ssh, rdp, vnc, sftp, ftp, http, https, smb, cifs
 
 ### installation:
-## simply copy this script into a user or system wide bin directory (suggestion: cp izopen ~/bin), must be into a PATH variable, and install the following commands:
+## simply copy this script into a user or system wide bin directory (suggestion: cp izopen ~/bin), must be into a PATH variable, and install the following system commands:
 ## dnf install -y yad kdelibs3 xfreerdp proxychains-ng keepassxc
 
 ## custom config:
 ## you can customize internal variables modifying the '$HOME/.config/izopen/izopen.conf' file (automatically created on first run)
 
-###NOTES
+### NOTE:
 ## KeePassX 0.x integration:
 ##        into advanded settings of keepassx select "Custom Browser Command" and insert:
 ##        izopen %1
@@ -42,7 +42,7 @@ VERSION_DATE="20220714"
 # default vnc connection software
 : ${helper_cmd_vnc:="vncviewer"}
 
-# dedault terminal software
+# default terminal app
 # define the command to use based on current desktop environment
 if   [ "$XDG_CURRENT_DESKTOP" = "MATE" ]; then
     : ${helper_cmd_terminal:="$(gsettings get org.mate.applications-terminal exec | tr -d \')"}
@@ -62,17 +62,12 @@ fi
 
 ## variables
 #########################################################################
-: ${debug:=0} # enable script debug
-: ${tunnel_create_force:=1}  # always create the tunnel for every new ssh connection
-: ${tunnel_use_force:=1}     # always use the tunnel for every opened uri
-: ${tunnel_use_force_ssh:=0} # always use the tunnel if connecting via ssh
-
+: ${debug:=0}              # enable script debug
+: ${tunnel_create:=1}      # try to create a new ssh tunnel when connecting via ssh
+: ${tunnel_use:=0}         # use the existing ssh tunnel
+: ${tunnel_use_force:=0}   # always use the tunnel for every opened uri
 : ${tunnel_port_min:=2000} # minimun tunnel port number to use
 : ${tunnel_port_max:=4999} # maximun tunnel port number to use
-
-# force the creation and usage of ssh tunnel if required
-[ $tunnel_create_force = 1 ] && tunnel_create=1
-[ $tunnel_use_force = 1 ] && tunnel_use=1
 
 # default izopen config file
 izopen_conf_dir="$HOME/.config/izopen"
@@ -89,7 +84,7 @@ izopen_conf_proxychains_dir="$izopen_conf_dir/proxychains"
 [ ! -e "$izopen_conf_proxychains_dir" ] && mkdir -p "$izopen_conf_proxychains_dir"
 
 # izopen log file
-izopen_log="/tmp/izopen.log"
+izopen_log_file="$izopen_conf_dir/izopen.log"
 
 # read the latest tunnel port used
 [ -e "$izopen_conf_socks_port_current" ] && tunnel_port_current="$(cat "$izopen_conf_socks_port_current")"
@@ -99,7 +94,7 @@ izopen_log="/tmp/izopen.log"
 
 # commands helper functions
 #########################################################################
-make_default_config() {
+function make_default_config() {
   cat <<EOF
 ## terminal options
 #helper_cmd_terminal:="konsole"
@@ -118,7 +113,7 @@ make_default_config() {
 EOF
 }
 
-helper_ssh() {
+function helper_ssh() {
   if [ "$tunnel_create" = 1 ]; then
      title="H:$host P:$tunnel_port_create"
    else
@@ -153,7 +148,7 @@ helper_ssh() {
   #helper_cmd_ssh_opts="--title \"export PS1='\e[0;31m[\u@\h \W]\$ \e[m '; exec bash\""
 }
 
-helper_telnet() {
+function helper_telnet() {
   [ -z "$username" ] && read -p "username: " username;
   #[ -z "$password" ] && read -p "password: " password;
   
@@ -169,7 +164,7 @@ helper_telnet() {
 }
 
 
-helper_rdp() {
+function helper_rdp() {
   case $helper_cmd_rdp in
     rdesktop|xfreerdp)
       ## extract windows domain from username and convert to the right name
@@ -248,23 +243,23 @@ helper_rdp() {
   esac
 }
 
-helper_vnc() {
+function helper_vnc() {
   # vnc doesn't support username and actually don't accept the password. use the gnome keyring instead for this
   #helper_cmd="vinagre $schema://$host$([ -n $port ] && echo ":$port")"
   [ -n $port ] && helper_cmd_opts+=":$port"
   helper_cmd="$helper_cmd_vnc ${host}${helper_cmd_opts}"
 }
 
-helper_sftp() {
+function helper_sftp() {
   #helper_cmd="xdg-open \"$args\""
   helper_cmd="helper_ssh \"$args\""
 }
 
-helper_ftp() {
+function helper_ftp() {
   helper_cmd="xdg-open \"$args\""
 }
 
-helper_http() {
+function helper_http() {
   # open the browser only on tunnel connection otherwise exit
   if [ $tunnel_use = 1 ]; then
     # run the connection
@@ -292,19 +287,19 @@ helper_http() {
   fi
 }
 
-helper_https() {
+function helper_https() {
   helper_http "$args"
 }
 
-helper_about() {
+function helper_about() {
   helper_http "$args"
 }
 
-helper_smb() {
+function helper_smb() {
   helper_cmd="xdg-open \"$args\""
 }
 
-helper_cifs() {
+function helper_cifs() {
   helper_cmd="xdg-open \"$args\""
 }
 
@@ -313,7 +308,7 @@ helper_cifs() {
 # DON'T TOUCH ANYTHING BELLOW
 #########################################################################
 
-helper_tunnel_create() {
+function helper_tunnel_create() {
  # put specific address port forwarding port config file
  izopen_conf_socks_address="$izopen_conf_hosts_dir/$(echo $host | sed -e 's/[^A-Za-z0-9_-]/_/g').conf"
 
@@ -328,6 +323,7 @@ helper_tunnel_create() {
     [ $? != 0 ] && tunnel_create=1 || tunnel_create=0
  fi
 
+# manage the proxychains tunnel configuration
  if [ "$tunnel_create" = 1 ]
   then
     # import port configuration of remote address if exist
@@ -366,12 +362,10 @@ helper_tunnel_create() {
  fi
 }
 
-helper_tunnel() {
- # create the ssh tunnel if the uri is ssh://
+function helper_tunnel_manage() {
+ # verify if needed to create the ssh tunnel only if the uri is ssh://
  case ${schema} in
    ssh)
-       # don't use tunnel if the schema is ssh and is not forced
-       [ $tunnel_use_force_ssh -eq 0 ] && tunnel_use=0
        helper_tunnel_create
        ;;
  esac
@@ -386,11 +380,6 @@ helper_tunnel() {
    [ ! -z "$tunnel_port_current" ] && echo $tunnel_port_current > "$izopen_conf_socks_port_current"
  fi
 
- # debug
- #echo tunnel_create=$tunnel_create
- #echo tunnel_use=$tunnel_use
- #echo tunnel_port_current="$tunnel_port_current"
-
  # create the proxychains4 config
  if [[ $tunnel_use = 1 && ! -z $tunnel_port_current && $tunnel_port_current =~ ^-?[0-9]+$ && $tunnel_port_current -ge $tunnel_port_min && $tunnel_port_current -le $tunnel_port_max ]]
   then
@@ -404,7 +393,7 @@ helper_tunnel() {
  [ -z $tunnel_port_current ] && tunnel_use=0
 }
 
-print_log() {
+function print_log() {
   # print the parsed fields
   echo "========================================================================================"
   echo "$(date +"%Y-%m-%d %H:%M:%S %Z") $0 $uri_safe"
@@ -412,22 +401,24 @@ print_log() {
   echo "-- output ------------------------------------------------------------------------------"
 }
 
-print_debug() {
+function print_debug() {
   # print the parsed fields
   echo "-- debug -------------------------------------------------------------------------------"
-  echo "        uri: $uri"
-  echo "     schema: $schema"
-  echo "   username: $username"
-  echo "   password: $password"
-  echo "       host: $host"
-  echo "       port: $port"
-  echo "       path: $path"
-  echo "tunnel port: $tunnel_port_current"
-  echo "cmd prepend: $helper_cmd_prepend"
-  echo "        cmd: $helper_cmd"
+  echo "          uri: $uri"
+  echo "       schema: $schema"
+  echo "     username: $username"
+  echo "     password: $password"
+  echo "         host: $host"
+  echo "         port: $port"
+  echo "         path: $path"
+  echo "tunnel_create: $tunnel_create"
+  echo "   tunnel_use: $tunnel_use"
+  echo "  tunnel port: $tunnel_port_current"
+  echo "  cmd prepend: $helper_cmd_prepend"
+  echo "          cmd: $helper_cmd"
 }
 
-open_uri() {
+function uri_open() {
   local uri="$1"
   local args="$@"
   shift
@@ -445,6 +436,9 @@ open_uri() {
   [ -z "$password" ] && local uri_safe=$uri || local uri_safe="$(echo "$uri" | sed "s/:$password//g")"
   uri_unset
   
+  # force the usage of ssh tunnel for every openened url
+  [ $tunnel_use_force = 1 ] && tunnel_use=1
+  
   # Use an already estabilished ssh tunnel and open default http handler defining schema as http
   [[ $tunnel_use -eq 1 && -z "$uri" ]] && schema=http
   
@@ -455,7 +449,7 @@ open_uri() {
   case $schema in
     ssh|telnet|rdp|vnc|sftp|ftp|http|https|about|smb|cifs|file)
       # create or use ssh tunnel if required
-      [[ "$tunnel_create" = 1 || "$tunnel_use" = 1 ]] && helper_tunnel "$args"
+      [[ "$tunnel_create" = 1 || "$tunnel_use" = 1 ]] && helper_tunnel_manage "$args"
       # obtain commands to use to connect
       helper_${schema} "$args"
       
@@ -469,7 +463,7 @@ open_uri() {
 
       # connect to remote server
       eval "$helper_cmd"
-      [ $? != 0 ] && tail -n 30 "${izopen_log}" | sed -n "H; /^$(date '+%Y-%m-%d')/h; \${g;p;}" | LANG=C yad --center --width=1000 --height=500 --title "Connection Error" --button="Close":0 --text "Errors from ${izopen_log}" --text-info --fontname="Monospace 8"
+      [ $? != 0 ] && tail -n 30 "${izopen_log_file}" | sed -n "H; /^$(date '+%Y-%m-%d')/h; \${g;p;}" | LANG=C yad --center --width=1000 --height=500 --title "Connection Error" --button="Close":0 --text "Errors from ${izopen_log_file}" --text-info --fontname="Monospace 8"
       ;;
     *)
       echo "ERROR: invalid URI specified: $args"
@@ -572,7 +566,7 @@ Options:
   -h, --help             Show help options
   -d, --debug            Enable debug (default: $debug)
   -u, --uri              Specify the URI to open (you can also specify the URL as last argument without this option)
-  -t, --tunnel           Open the http browser using an already estabilished ssh tunnel (default: $tunnel_use)
+  -t, --tunnel           Force the usage request of an already estabilished ssh tunnel when opening the uri (default: $tunnel_use)
   --mkconfig             Create default config file, overwriting it if already exist (default location: $izopen_conf_file)
 
 Examples:
@@ -636,8 +630,7 @@ while [ $# -gt 0 ]; do
       debug="1"
       ;;
     -t|--tunnel)
-      tunnel_create=1
-      tunnel_use=1
+      tunnel_use_force=1
       ;;
     --mkconfig)
       if [ -e "$izopen_conf_file" ]; then
@@ -658,9 +651,9 @@ done
 
 # if the -u|--uri switch is not used, then read the latest argument if exist
 [ -z "$uri" ] && uri="$@"
-[[ -z "$uri" && $tunnel_use -eq 0 ]] && echo "ERROR: no URI specified" && exit 1
+[[ -z "$uri" && $tunnel_use_force -eq 0 ]] && echo "ERROR: no URI specified" && exit 1
 
 # create defualt user config file if not exist
 [ ! -e "$izopen_conf_file" ] && make_default_config > "$izopen_conf_file"
 
-open_uri "$uri" 2>&1 | tee -a "${izopen_log}" 2>&1
+uri_open "$uri" 2>&1 | tee -a "${izopen_log_file}" 2>&1
