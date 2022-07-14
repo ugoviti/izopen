@@ -99,7 +99,7 @@ izopen_conf_file="$izopen_conf_dir/izopen.conf"
 izopen_conf_socks_port_current="$izopen_conf_dir/socks_port_current.conf"
 
 izopen_conf_hosts_dir="$izopen_conf_dir/hosts"
-izopen_conf_proxychain_dir="$izopen_conf_dir/proxychains"
+izopen_conf_proxychains_dir="$izopen_conf_dir/proxychains"
 
 # make dirs if not exist
 [ ! -e "$izopen_conf_dir" ] && mkdir -p "$izopen_conf_dir"
@@ -290,7 +290,7 @@ helper_http() {
         helper_cmd_opts+=" --no-first-run"
         helper_cmd_opts+=" --disable-translate"
         helper_cmd_opts+=" --password-store=basic"
-        helper_cmd="google-chrome --user-data-dir=\"$izopen_cache_dir/google-chrome/$tunnel_port_current\" --proxy-server=\"socks5://localhost:$tunnel_port_current\" $helper_cmd_opts \"$args\""
+        helper_cmd="google-chrome --user-data-dir=\"$izopen_conf_dir/google-chrome/$tunnel_port_current\" --proxy-server=\"socks5://localhost:$tunnel_port_current\" $helper_cmd_opts \"$args\""
         ;;
       midori)
         helper_cmd="midori -c \"$izopen_conf_dir/midori-$tunnel_port_current\" \"$args\""
