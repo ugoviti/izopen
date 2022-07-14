@@ -119,12 +119,19 @@ izopen_log="/tmp/izopen.log"
 #########################################################################
 make_default_config() {
   cat <<EOF
-#debug=1
+## terminal options
 #helper_cmd_terminal:="konsole"
+
+## rdp options
 #helper_cmd_rdp="xfreerdp"
+#helper_cmd_opts_rdp="/drive:tmp,/tmp"
+
+## browser options
 #helper_cmd_http="google-chrome"
 #helper_cmd_opts_http="--proxy-bypass-list='<-loopback>'"
-#helper_cmd_opts_rdp="/drive:tmp,/tmp"
+
+## misc options
+#debug=1
 #nc_opts="-z" 
 EOF
 }
