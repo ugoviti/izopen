@@ -82,7 +82,7 @@ fi
 #########################################################################
 : ${debug:=0} # enable script debug
 : ${tunnel_create_force:=1}  # always create the tunnel for every new ssh connection
-: ${tunnel_use_force:=1}     # always use the tunnel for every opened url
+: ${tunnel_use_force:=1}     # always use the tunnel for every opened uri
 : ${tunnel_use_force_ssh:=0} # always use the tunnel if connecting via ssh
 
 : ${tunnel_port_min:=2000} # minimun tunnel port number to use
@@ -93,21 +93,42 @@ fi
 [ $tunnel_use_force = 1 ] && tunnel_use=1
 
 # default izopen config file
-izopen_tmp_dir="$HOME/.config/izopen"
-izopen_conf_custom="$izopen_tmp_dir/izopen.conf"
-izopen_tmp_socks_port_current="$izopen_tmp_dir/socks_port_current.conf"
+izopen_conf_dir="$HOME/.config/izopen"
+izopen_cache_dir="$HOME/.cache/izopen"
+izopen_conf_file="$izopen_conf_dir/izopen.conf"
+izopen_conf_socks_port_current="$izopen_conf_dir/socks_port_current.conf"
+
+izopen_conf_hosts_dir="$izopen_conf_dir/hosts"
+izopen_conf_proxychain_dir="$izopen_conf_dir/proxychains"
+
+# make dirs if not exist
+[ ! -e "$izopen_conf_dir" ] && mkdir -p "$izopen_conf_dir"
+[ ! -e "$izopen_conf_hosts_dir" ] && mkdir -p "$izopen_conf_hosts_dir"
+[ ! -e "$izopen_conf_proxychains_dir" ] && mkdir -p "$izopen_conf_proxychains_dir"
 
 # izopen log file
 izopen_log="/tmp/izopen.log"
 
 # read the latest tunnel port used
-[ -e "$izopen_tmp_socks_port_current" ] && tunnel_port_current="$(cat "$izopen_tmp_socks_port_current")"
+[ -e "$izopen_conf_socks_port_current" ] && tunnel_port_current="$(cat "$izopen_conf_socks_port_current")"
 
 # import configuration from izopen.conf if exist and override default script variables
-[ -f "${izopen_conf_custom}" ] && source "${izopen_conf_custom}"
+[ -f "${izopen_conf_file}" ] && source "${izopen_conf_file}"
 
 # commands helper functions
 #########################################################################
+make_default_config() {
+  cat <<EOF
+#debug=1
+#helper_cmd_terminal:="konsole"
+#helper_cmd_rdp="xfreerdp"
+#helper_cmd_http="google-chrome"
+#helper_cmd_opts_http="--proxy-bypass-list='<-loopback>'"
+#helper_cmd_opts_rdp="/drive:tmp,/tmp"
+#nc_opts="-z" 
+EOF
+}
+
 helper_ssh() {
   if [ "$tunnel_create" = 1 ]; then
      title="H:$host P:$tunnel_port_create"
@@ -269,10 +290,10 @@ helper_http() {
         helper_cmd_opts+=" --no-first-run"
         helper_cmd_opts+=" --disable-translate"
         helper_cmd_opts+=" --password-store=basic"
-        helper_cmd="google-chrome --user-data-dir=\"$izopen_tmp_dir/google-chrome/$tunnel_port_current\" --proxy-server=\"socks5://localhost:$tunnel_port_current\" $helper_cmd_opts \"$args\""
+        helper_cmd="google-chrome --user-data-dir=\"$izopen_cache_dir/google-chrome/$tunnel_port_current\" --proxy-server=\"socks5://localhost:$tunnel_port_current\" $helper_cmd_opts \"$args\""
         ;;
       midori)
-        helper_cmd="midori -c \"$izopen_tmp_dir/midori-$tunnel_port_current\" \"$args\""
+        helper_cmd="midori -c \"$izopen_conf_dir/midori-$tunnel_port_current\" \"$args\""
         ;;
       *)
         helper_cmd="xdg-open \"$args\""
@@ -304,34 +325,34 @@ helper_cifs() {
 
 helper_tunnel_create() {
  # put specific address port forwarding port config file
- izopen_tmp_socks_address="$izopen_tmp_dir/$(echo $host | sed -e 's/[^A-Za-z0-9_-]/_/g').conf"
+ izopen_conf_socks_address="$izopen_conf_hosts_dir/$(echo $host | sed -e 's/[^A-Za-z0-9_-]/_/g').conf"
 
+ # FIXME legacy config file path management
+ izopen_conf_socks_address_legacy="$izopen_conf_dir/$(echo $host | sed -e 's/[^A-Za-z0-9_-]/_/g').conf"
+ [ -e "$izopen_conf_socks_address_legacy" ] && mv "$izopen_conf_socks_address_legacy" "$izopen_conf_socks_address"
+  
  # don't create a new tunnel if it's already opened
- if [ -f "$izopen_tmp_socks_address" ]
+ if [ -f "$izopen_conf_socks_address" ]
   then
-    nc $nc_opts 127.0.0.1 $(cat "$izopen_tmp_socks_address") </dev/null 2>/dev/null
+    nc $nc_opts 127.0.0.1 $(cat "$izopen_conf_socks_address") </dev/null 2>/dev/null
     [ $? != 0 ] && tunnel_create=1 || tunnel_create=0
  fi
 
  if [ "$tunnel_create" = 1 ]
   then
-    # make tmp dir if not exist
-    [ ! -e "$izopen_tmp_dir" ] && mkdir -p "$izopen_tmp_dir"
-    [ ! -e "$izopen_tmp_dir/proxychains" ] && mkdir -p "$izopen_tmp_dir/proxychains"
-
     # import port configuration of remote address if exist
-    if [ -e "$izopen_tmp_socks_address" ] ; then 
-      tunnel_port_create="$(cat "$izopen_tmp_socks_address")"
+    if [ -e "$izopen_conf_socks_address" ] ; then 
+      tunnel_port_create="$(cat "$izopen_conf_socks_address")"
     fi
 
-    if [ ! -e "$izopen_tmp_socks_address" ] ; then
+    if [ ! -e "$izopen_conf_socks_address" ] ; then
         # find first free port
         local tunnel_port
         tunnel_port=$tunnel_port_min
 
         until [ ! -z "$tunnel_port_create" ]; do
-          izopen_tmp_socks_proxy="$izopen_tmp_dir/proxychains/$tunnel_port.conf"
-          if [ ! -e "$izopen_tmp_socks_proxy" ];then
+          izopen_conf_socks_proxy="$izopen_conf_proxychains_dir/$tunnel_port.conf"
+          if [ ! -e "$izopen_conf_socks_proxy" ];then
               tunnel_port_create=$tunnel_port
             else
               let tunnel_port++
@@ -340,14 +361,14 @@ helper_tunnel_create() {
     fi
 
     # make proxychains config if not exist
-    izopen_tmp_socks_proxy="$izopen_tmp_dir/proxychains/$tunnel_port_create.conf"
-    [ ! -e "$izopen_tmp_socks_proxy" ] && echo -e "strict_chain\nquiet_mode\nproxy_dns\n[ProxyList]\nsocks5 127.0.0.1 $tunnel_port_create" > "$izopen_tmp_socks_proxy"
+    izopen_conf_socks_proxy="$izopen_conf_proxychains_dir/$tunnel_port_create.conf"
+    [ ! -e "$izopen_conf_socks_proxy" ] && echo -e "strict_chain\nquiet_mode\nproxy_dns\n[ProxyList]\nsocks5 127.0.0.1 $tunnel_port_create" > "$izopen_conf_socks_proxy"
 
     # save the current address used port
-    echo $tunnel_port_create > "$izopen_tmp_socks_address"
+    echo $tunnel_port_create > "$izopen_conf_socks_address"
 
     # save the last used/reused port
-    echo $tunnel_port_create > "$izopen_tmp_socks_port_current"
+    echo $tunnel_port_create > "$izopen_conf_socks_port_current"
 
     # dynamic port forwarding with compression
     # add ssh options to create socks tunnel and compression
@@ -356,11 +377,11 @@ helper_tunnel_create() {
 }
 
 helper_tunnel() {
- # create the ssh tunnel if the url is ssh://
+ # create the ssh tunnel if the uri is ssh://
  case ${schema} in
    ssh)
        # don't use tunnel if the schema is ssh and is not forced
-       [ "$tunnel_use_force_ssh" = 0 ] && tunnel_use=0
+       [ $tunnel_use_force_ssh -eq 0 ] && tunnel_use=0
        helper_tunnel_create
        ;;
  esac
@@ -372,7 +393,7 @@ helper_tunnel() {
    tunnel_port_current=$(LANG=C yad --center --title "izOpen SSH Proxy" --entry --numeric --entry-text=$tunnel_port_current --text="<b>Inserire la porta del Proxy Socks</b> \nCompresa fra $tunnel_port_min e $tunnel_port_max\n" $tunnel_port_min $tunnel_port_max --timeout=10 --timeout-indicator=bottom | tr -d [:alpha:] | tr -d [:cntrl:] | tr -d [:space:])
 
    # save the current used port for later usage
-   [ ! -z "$tunnel_port_current" ] && echo $tunnel_port_current > "$izopen_tmp_socks_port_current"
+   [ ! -z "$tunnel_port_current" ] && echo $tunnel_port_current > "$izopen_conf_socks_port_current"
  fi
 
  # debug
@@ -384,7 +405,7 @@ helper_tunnel() {
  if [[ $tunnel_use = 1 && ! -z $tunnel_port_current && $tunnel_port_current =~ ^-?[0-9]+$ && $tunnel_port_current -ge $tunnel_port_min && $tunnel_port_current -le $tunnel_port_max ]]
   then
     # proxychains configuration
-    helper_cmd_prepend="proxychains4 -f $izopen_tmp_dir/proxychains/$tunnel_port_current.conf "
+    helper_cmd_prepend="proxychains4 -f $izopen_conf_proxychains_dir/$tunnel_port_current.conf "
 #  else
 #    [ ! -z $tunnel_port_current ] && LANG=C yad --center --error --text="La porta specificata non è valida: $tunnel_port_current\n\nInserire una porta compresa fra $tunnel_port_min e $tunnel_port_max" 2>/dev/null && unset tunnel_port_current
  fi
@@ -434,11 +455,14 @@ open_uri() {
   [ -z "$password" ] && local uri_safe=$uri || local uri_safe="$(echo "$uri" | sed "s/:$password//g")"
   uri_unset
   
+  # Use an already estabilished ssh tunnel and open default http handler defining schema as http
+  [[ $tunnel_use -eq 1 && -z "$uri" ]] && schema=http
+  
   # workarounds
-  [ "${schema}" = "sftp" ] && schema="ssh" # alway use ssh handler with sftp url
+  [ "$schema" = "sftp" ] && schema="ssh" # alway use ssh handler with sftp uri
 
   ## customize the following uri for command associations:
-  case ${schema} in
+  case $schema in
     ssh|telnet|rdp|vnc|sftp|ftp|http|https|about|smb|cifs|file)
       # create or use ssh tunnel if required
       [[ "$tunnel_create" = 1 || "$tunnel_use" = 1 ]] && helper_tunnel "$args"
@@ -537,12 +561,13 @@ $NAME - $DESCRIPTION
 written by Ugo Viti <ugo.viti@initzero.it>
 version: $VERSION - release: $VERSION_DATE
 
-Usage: $0 [options] URL
+Usage: $0 [options] URI
 
 Options:
   -h, --help             Show help options
   -d, --debug            Enable debug (default: $debug)
-  -t, --tunnel           Enable the usage of estabilished ssh tunnel (default: $tunnel_use)
+  -u, --uri              Specify the URI to open
+  -t, --tunnel           Open the http browser using an already estabilished ssh tunnel (default: $tunnel_use)
 
 Examples:
   # open https website
@@ -551,6 +576,9 @@ Examples:
   # open ssh connection on port 222
   $ $0 ssh://root@192.168.1.1:222
 
+  # open a http browser using an already connected ssh tunnel
+  $ $0 -t
+  
   # open rdp connection
   $ $0 rdp://Administrator:s3cur3Passw0Rd@192.168.1.1:33189
 EOF
@@ -560,8 +588,8 @@ EOF
 [ $# = 0 ] && _usage && exit 1
 
 # define command short and long options
-_optionsShort="u:dh"
-_optionsLong="uri:,debug,help"
+_optionsShort="u:dth"
+_optionsLong="uri:,debug,tunnel,help"
 
 # options may be followed by one colon to indicate they have a required argument
 if ! options=$(getopt -o $_optionsShort -l $_optionsLong -- "$@"); then
@@ -601,4 +629,9 @@ done
 
 # if the -u|--uri switch is not used, then read the latest argument if exist
 [ -z "$uri" ] && uri="$@"
+[[ -z "$uri" && $tunnel_use -eq 0 ]] && echo "ERROR: no URI specified" && exit 1
+
+# create defualt user config file if not exist
+[ ! -e "$izopen_conf_file" ] && make_default_config > "$izopen_conf_file"
+
 open_uri "$uri" 2>&1 | tee -a "${izopen_log}" 2>&1
