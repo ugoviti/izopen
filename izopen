@@ -629,8 +629,11 @@ Examples:
   # open a smb file share with default file manager:
   $ $_prog smb://Administrator:password@server
   
-  #open a http browser using an already connected ssh tunnel:
+  # open a http browser using an already connected ssh tunnel (ask for the port):
   $ $_prog -t
+  
+  # open a http browser using an already connected ssh tunnel specifing the port (-t option is implicit for -p):
+  $ $_prog -p 2069
 EOF
 }
 
