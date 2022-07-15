@@ -17,15 +17,22 @@ chmod 755 ~/.local/bin/izopen
 ### Packages
 Download and install the latest version of KeePassXC (https://keepassxc.org/).
 
-**KeePassXC 2.x integration (Fedora / CentOS 8):**
-`dnf install -y yad xfreerdp proxychains-ng keepassxc sshpass xclip`
+**KeePassXC 2.x integration (Fedora / CentOS 8):**  
+```
+dnf install -y yad xfreerdp proxychains-ng keepassxc sshpass xclip
+```
 
 ### Desktop Intergration
 
 #### MIME associations
+
+Be sure the applications directory exist
 ```
 mkdir -p ~/.local/share/applications/
- 
+```
+
+Create XDG desktop files
+```
 echo "[Desktop Entry]
 Version=1.0
 Name=izOpen SSH Handler
@@ -84,7 +91,7 @@ xdg-mime default izopen-rdp-handler.desktop x-scheme-handler/rdp
 xdg-mime default izopen-vnc-handler.desktop x-scheme-handler/vnc
 ```
 
-Query the correct associations:
+Verify the correct associations:
 ```
 xdg-mime query default x-scheme-handler/ssh
 xdg-mime query default x-scheme-handler/telnet
@@ -92,7 +99,7 @@ xdg-mime query default x-scheme-handler/rdp
 xdg-mime query default x-scheme-handler/vnc
 ```
 
-Rebuild the mime database:
+Rebuild the Desktop MIME database:
 ```
 update-desktop-database ~/.local/share/applications/
 update-mime-database    ~/.local/share/mime/
@@ -116,7 +123,7 @@ Categories=GTK;Network;WebBrowser;
 MimeType=text/html;x-scheme-handler/http;x-scheme-handler/https;' > ~/.local/share/applications/izopen-http.desktop
 ```
 
+Add this desktop launcher into you Desktop Bar or Menu
+
 ## Usage (with examples):
 `izopen -h`
-
-

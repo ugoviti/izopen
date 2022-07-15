@@ -2,7 +2,7 @@
 NAME="izopen"
 DESCRIPTION="multi protocol bash script to auto opening given URI and auto creating ssh reverse tunnel socks proxy"
 VERSION="3.0.0"
-VERSION_DATE="20220714"
+VERSION_DATE="20220715"
 
 ## izOpen is very useful when used with KeePassX or any Desktop/Browser Password Manager as secure URI launcher
 ## written by Ugo Viti <ugo.viti@initzero.it>
