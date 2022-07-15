@@ -79,6 +79,8 @@ fi
 
 ## variables
 #########################################################################
+_prog=$( echo ${0##*/} )     # define the command name
+
 : ${debug:=0}                # enable script debug
 : ${tunnel_create:=1}        # try to create a new ssh tunnel when connecting via ssh
 : ${tunnel_use:=1}           # use the existing ssh tunnel
@@ -521,12 +523,20 @@ function helper_tunnel_manage() {
   [ -z $tunnel_port_use ] && tunnel_use=0
 }
 
-function print_log() {
+function print_header_log() {
   # print the parsed fields
-  echo "========================================================================================"
-  echo "$(date +"%Y-%m-%d %H:%M:%S %Z") $0 $uri_safe"
+  echo "----------------------------------------------------------------------------------------"
+  echo "$(date +"%Y-%m-%d %H:%M:%S %Z") user:[$USER] uid:[$UID] uri:[$uri_safe]"
   [ $debug = 1 ] && print_debug
   echo "-- output ------------------------------------------------------------------------------"
+}
+
+function print_output_log() {
+  tail -n 350 "${izopen_log_file}" | sed -n "H; /^$(date '+%Y-%m-%d')/h; \${g;p;}" | LANG=C yad --center --width=1000 --height=500 --title "Connection Error" --button="Close":0 --text "Errors from ${izopen_log_file}" --text-info --fontname="Monospace 8"
+}
+
+function print_footer_log() {
+  echo "----------------------------------------------------------------------------------------"
 }
 
 function print_debug() {
@@ -545,6 +555,7 @@ function print_debug() {
  helper_cmd_prepend: $helper_cmd_prepend
                 cmd: $helper_cmd
 EOF
+  echo "----------------------------------------------------------------------------------------"
 }
 
 function uri_open() {
@@ -608,7 +619,7 @@ function uri_open() {
         helper_${schema} "$uri"
               
         # log the command execution
-        print_log
+        print_header_log
 
         # make the connection to the remote server
         eval "$helper_cmd"
@@ -625,7 +636,8 @@ function uri_open() {
       done
       
       # log the command output
-      [ $RETVAL != 0 ] && tail -n 350 "${izopen_log_file}" | sed -n "H; /^$(date '+%Y-%m-%d')/h; \${g;p;}" | LANG=C yad --center --width=1000 --height=500 --title "Connection Error" --button="Close":0 --text "Errors from ${izopen_log_file}" --text-info --fontname="Monospace 8"
+      [ $RETVAL != 0 ] && print_output_log
+      #print_footer_log
       ;;
     *)
       echo "ERROR: invalid URI specified: $uri"
