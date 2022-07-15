@@ -4,7 +4,7 @@ DESCRIPTION="multi protocol bash script to auto opening given URI and auto creat
 VERSION="3.0.0"
 VERSION_DATE="20220714"
 
-## izOpen is very useful to use with KeePassX or any Desktop/Browser Password Manager as secure URI launcher
+## izOpen is very useful when used with KeePassX or any Desktop/Browser Password Manager as secure URI launcher
 ## written by Ugo Viti <ugo.viti@initzero.it>
 
 ## Features:
@@ -165,7 +165,7 @@ function helper_ssh() {
 function helper_telnet() {
   helper_terminal
   
-  [ -z "$username" ] && read -p "username: " username;
+  #[ -z "$username" ] && read -p "username: " username;
   #[ -z "$password" ] && read -p "password: " password;
   
   # manage non mandatory cmd options
@@ -197,23 +197,26 @@ function helper_http() {
         helper_cmd_opts+=" --password-store=basic"
         helper_cmd_opts+=" --proxy-server=\"socks5://localhost:$tunnel_port_use\""
         helper_cmd_opts+=" --user-data-dir=\"$izopen_conf_dir/google-chrome/$tunnel_port_use\""
-        
-        # because google chrome doesn't works via proxychains wrapper, don't use the $helper_cmd_prepend command
-        unset helper_cmd_prepend
       fi
-      
-      helper_cmd="google-chrome $helper_cmd_opts \"$args\""
+      # because google chrome doesn't works via proxychains wrapper, don't use the $helper_cmd_prepend command
+      unset helper_cmd_prepend
       ;;
     midori)
-      helper_cmd="${helper_cmd_prepend}midori -c \"$izopen_conf_dir/midori/$tunnel_port_use\" $helper_cmd_opts \"$args\""
+      helper_cmd_opts+=" -c \"$izopen_conf_dir/midori/$tunnel_port_use\""
       ;;
     *)
-      helper_cmd="${helper_cmd_prepend}xdg-open $helper_cmd_opts \"$args\""
+      helper_cmd_http="xdg-open"
       ;;
   esac
+  
+  # launch the uri
+  helper_cmd="${helper_cmd_prepend}${helper_cmd_http} ${helper_cmd_opts} \"${args}\""
 }
 
 function helper_rdp() {
+  # manage non mandatory cmd options
+  helper_cmd_opts="${helper_cmd_opts_rdp}"
+
   case $helper_cmd_rdp in
     rdesktop|xfreerdp)
       ## extract windows domain from username and convert to the right name
@@ -251,9 +254,6 @@ function helper_rdp() {
       fi
       ;;
   esac
-  
-  # manage non mandatory cmd options
-  helper_cmd_opts="${helper_cmd_opts_rdp}"
   
   # run the connection
   case $helper_cmd_rdp in
