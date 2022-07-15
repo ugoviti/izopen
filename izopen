@@ -155,7 +155,8 @@ function helper_terminal() {
 
   case $helper_cmd_terminal in
     konsole)
-      helper_cmd_opts_terminal="-p tabtitle='(%u) %H'"
+      #helper_cmd_opts_terminal="-p tabtitle='(%u) %H'"
+      helper_cmd_opts_terminal+=" -p tabtitle='$title'"
       helper_cmd_opts_terminal+=" -p RemoteTabTitleFormat='$title'"
       #helper_cmd_opts_terminal+=" --noclose"
       ;;
@@ -184,7 +185,11 @@ function helper_ssh() {
   [ "$tunnel_create" = 1 ] && helper_cmd_opts+=" -D $tunnel_port_create"
   
   # password less login using sshpass
-  #[ ! -z "$password" ] && helper_cmd_prepend+=" sshpass -e "
+  if [ ! -z "$password" ]; then
+    # pretty insecure, but the export is needed to avoid printing password into processlist
+    export SSHPASS=$password
+    helper_cmd_prepend+=" sshpass -e "
+  fi
 
   # set the final command
   helper_cmd="${helper_cmd_terminal} $helper_cmd_opts_terminal -e \"${helper_cmd_prepend}${helper_cmd_ssh}${helper_cmd_opts}\""
@@ -520,11 +525,12 @@ function uri_open() {
   local username="$uri_username"
   local password="$uri_password"
   # try to obtain password from clipboard
-  if [ -z "$password" ]; then
-    local clipboard=$(xsel -ob)
-    [ ! -z "$clipboard" ] && local password="$(echo $clipboard | tr -d [:cntrl:])"
-    # pretty insecure, but the export is needed to avoid printing password into processlist
-    export SSHPASS=$password
+  if [[ -z "$password" ]]; then
+    local clipboard=$(xsel)
+    # remove the password from the clipboard
+    # FIXME using a workaround because xsel doesn't clean the clipboard contents I use a SPACE here. of course you can't use single space passwords here :)
+    echo -n " " | xsel -i
+    [[ ! -z "$clipboard" || "$clipboard" != " " ]] && local password="$(echo $clipboard | tr -d [:cntrl:])" || unset password
   fi
   local host="$uri_host"
   local port="$uri_port"
@@ -558,9 +564,8 @@ function uri_open() {
       # manage the use or creation of ssh tunnel
       [[ "$tunnel_create" = 1 || "$tunnel_use" = 1 ]] && helper_tunnel_manage "$uri"
       
-      TRY=1
-      TRYMAX=3
-      until [ $TRY -gt $TRYMAX ]; do
+      TRY=1; TRYMAX=3
+      until [ $TRY -ge $TRYMAX ]; do
         # obtain commands to use to connect
         helper_${schema} "$uri"
               
@@ -570,12 +575,14 @@ function uri_open() {
         # make the connection to the remote server
         eval "$helper_cmd"
         RETVAL=$?
-        echo TRY:[$TRY/$TRYMAX] RETVAL:[$RETVAL]
         
-        # freerdp ERRCONNECT_LOGON_FAILURE workaround. if the previous run contain a password error unset the password and retry
-        [ $RETVAL = 134 ] && unset password
+        # debug
+        #echo TRY:[$TRY/$TRYMAX] RETVAL:[$RETVAL]
         
-        # retry or continue
+        # for safety reasons unset the password after first try
+        unset password
+        
+        # exit or retry
         [ $RETVAL = 0 ] && TRY=$TRYMAX || let TRY+=1
       done
       
@@ -789,7 +796,7 @@ done
 # check if all required system command are installed
 check_system_commands $system_commands
 
-uri_open "$uri" 2>&1 | tee -a "${izopen_log_file}" 2>&1
+uri_open "$uri" 2>&1 | tee -a "${izopen_log_file}"
 
 # be sure to unset all dangerous variables
 trap "unset password SSHPASS" 0
