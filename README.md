@@ -17,9 +17,9 @@ chmod 755 ~/.local/bin/izopen
 ### Packages
 Download and install the latest version of KeePassXC (https://keepassxc.org/).
 
-**KeePassXC 2.x integration (Fedora / CentOS 8):**  
+**KeePassXC 2.x integration (Fedora / RHEL 8):**  
 ```
-dnf install -y yad xfreerdp proxychains-ng keepassxc sshpass xclip
+sudo dnf install -y proxychains-ng xdg-utils yad openssh-clients sshpass telnet nmap-ncat xsel freerdp remmina keepassxc
 ```
 
 ### Desktop Intergration
