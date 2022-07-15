@@ -44,8 +44,8 @@ system_commands="yad nc xdg-open ssh sshpass telnet xsel proxychains xfreerdp re
 
 # default command for RDP
 #: ${helper_cmd_rdp:="rdesktop"}
-: ${helper_cmd_rdp:="xfreerdp"}
-#: ${helper_cmd_rdp:="remmina"}
+#: ${helper_cmd_rdp:="xfreerdp"}
+: ${helper_cmd_rdp:="remmina"}
 
 # remmina specific, separe with a space every options
 : ${helper_cmd_conf_remmina:="drive=/tmp"}
