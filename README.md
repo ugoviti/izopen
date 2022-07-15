@@ -112,13 +112,13 @@ Create a new file: `~/.local/share/applications/izopen-http.desktop`
 echo '#!/usr/bin/env xdg-open
 [Desktop Entry]
 Version=1.0
-Name=Web Browser via SSH tunnel
+Name=izOpen Web Browser through SSH tunnel
 Comment=Browse the Web through the specified local SSH tunnnel socks proxy port
 Exec=izopen -t
 StartupNotify=true
 Terminal=false
 Type=Application
-Icon=web-browser
+Icon=proxytunnel
 Categories=GTK;Network;WebBrowser;
 MimeType=text/html;x-scheme-handler/http;x-scheme-handler/https;' > ~/.local/share/applications/izopen-http.desktop
 ```
