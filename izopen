@@ -28,8 +28,13 @@ VERSION_DATE="20220715"
 ##        dnf install -y yad kdelibs3 proxychains-ng keepassx
 
 
+## mandatory system commands
+#########################################################################
+system_commands="yad nc xdg-open ssh sshpass telnet xsel proxychains xfreerdp remmina"
+
 ## helper commands
 #########################################################################
+
 # default command for SSH
 : ${helper_cmd_ssh:="ssh"}
 
@@ -39,8 +44,11 @@ VERSION_DATE="20220715"
 
 # default command for RDP
 #: ${helper_cmd_rdp:="rdesktop"}
-#: ${helper_cmd_rdp:="remmina"}
 : ${helper_cmd_rdp:="xfreerdp"}
+#: ${helper_cmd_rdp:="remmina"}
+
+# remmina specific, separe with a space every options
+: ${helper_cmd_conf_remmina:="drive=/tmp"}
 
 # # default command for VNC
 : ${helper_cmd_vnc:="vncviewer"}
@@ -88,9 +96,6 @@ izopen_conf_socks_port_current="$izopen_conf_dir/socks_port_current.conf"
 izopen_conf_hosts_dir="$izopen_conf_dir/hosts"
 izopen_conf_proxychains_dir="$izopen_conf_dir/proxychains"
 
-# mandatory system commands
-system_commands="yad ssh sshpass xsel"
-
 # make dirs if not exist
 [ ! -e "$izopen_conf_dir" ] && mkdir -p "$izopen_conf_dir"
 [ ! -e "$izopen_conf_hosts_dir" ] && mkdir -p "$izopen_conf_hosts_dir"
@@ -114,9 +119,13 @@ function make_default_config() {
 #helper_cmd_ssh="ssh"
 #helper_cmd_opts_ssh=" -z"
 
-## rdp options
+## rdp options (remmina)
+#helper_cmd_rdp="remmina"
+#helper_cmd_conf_remmina="drive=/tmp"
+
+## rdp options (freerdp)
 #helper_cmd_rdp="xfreerdp"
-#helper_cmd_opts_rdp="/drive:tmp,/tmp"
+#helper_cmd_opts_rdp="/drive:/tmp"
 
 ## browser options
 #helper_cmd_http="google-chrome"
@@ -188,7 +197,7 @@ function helper_ssh() {
   if [ ! -z "$password" ]; then
     # pretty insecure, but the export is needed to avoid printing password into processlist
     export SSHPASS=$password
-    helper_cmd_prepend+=" sshpass -e "
+    helper_cmd_prepend+="sshpass -e "
   fi
 
   # set the final command
@@ -241,7 +250,7 @@ function helper_http() {
         helper_cmd_opts+=" --proxy-server=\"socks5://localhost:$tunnel_port_use\""
         helper_cmd_opts+=" --user-data-dir=\"$izopen_conf_dir/google-chrome/$tunnel_port_use\""
       fi
-      # because google chrome doesn't works via proxychains wrapper, don't use the $helper_cmd_prepend command
+      # because this helper doesn't works via proxychains wrapper, don't use the $helper_cmd_prepend command
       unset helper_cmd_prepend
       ;;
     midori)
@@ -263,44 +272,40 @@ function helper_rdp() {
   helper_cmd_opts="${helper_cmd_opts_rdp}"
 
   # obtain general info used by all rdp commands
-  case $helper_cmd_rdp in
-    rdesktop|xfreerdp)
-      ## extract windows domain from username and convert to the right name
-      # using / or \ as domain separator the domain is the first argument
-      if [ ! -z $(echo "$username" | grep "/") ]; then
-        domain="$(echo "$username" | awk -F"/" '{print $1}')"
-        username="$(echo "$username" | awk -F"/" '{print $2}')"
-      fi
-      # using @ as domain separator the domain is the second argument
-      if [ ! -z $(echo "$username" | grep "@") ]; then
-        domain="$(echo "$username" | awk -F"@" '{print $2}')"
-        username="$(echo "$username" | awk -F"@" '{print $1}')"
-      fi
+  ## extract windows domain from username and convert to the right name
+  # using / or \ as domain separator the domain is the first argument
+  if [ ! -z $(echo "$username" | grep "/") ]; then
+    domain="$(echo "$username" | awk -F"/" '{print $1}')"
+    username="$(echo "$username" | awk -F"/" '{print $2}')"
+  fi
+  # using @ as domain separator the domain is the second argument
+  if [ ! -z $(echo "$username" | grep "@") ]; then
+    domain="$(echo "$username" | awk -F"@" '{print $2}')"
+    username="$(echo "$username" | awk -F"@" '{print $1}')"
+  fi
 
-      # FIXME: @20220714 still needed? commenting
-      #password="$(echo -e -n "$password" | sed 's/\%25/\%/g' | sed -e 's/%\([A-Z]\)/%\L\1/')" # keepassxc bug workaround: after the '%' char, keepassxc convert to uppercase the following char
+  # FIXME: @20220714 still needed? commenting
+  #password="$(echo -e -n "$password" | sed 's/\%25/\%/g' | sed -e 's/%\([A-Z]\)/%\L\1/')" # keepassxc bug workaround: after the '%' char, keepassxc convert to uppercase the following char
 
-      # special characters in password like ',!
-      #password="$(echo -e -n "$password" | sed -e "s/'/\\\'/g" -e "s/!/\\\!/g")"
+  # special characters in password like ',!
+  #password="$(echo -e -n "$password" | sed -e "s/'/\\\'/g" -e "s/!/\\\!/g")"
 
-      #[ -z "$username" ] && username=$domain && unset domain
-      #username="$(echo "$username" | sed 's/\//\\\\/g')"
+  #[ -z "$username" ] && username=$domain && unset domain
+  #username="$(echo "$username" | sed 's/\//\\\\/g')"
 
-      if [[ -z "$host" || -z "$username" || -z "$password" || "$username" = "{USERNAME}" || "$password" = "{PASSWORD}" || "$username" = "%7BUSERNAME%7D" || "$password" = "%7BPASSWORD%7D" ]]; then
-        frmdata=$(LANG=C yad --center --width=300 --title "Connect to remote computer" --focus-field=4 --align=right --form --field="Domain" "$domain" --field="Address" "$host" --field="Username" "$username" --field="Password":H "$password" --field="Security":CB 'rdp!tls!^nla!ext' --field="Admin Console":CHK | grep -v "WINDOW DECORATIONS RELOADED")
-        [ $? != 0 ] && exit 1
-        domain=$(echo $frmdata | awk 'BEGIN {FS="|" } { print $1 }')
-        host=$(echo $frmdata | awk 'BEGIN {FS="|" } { print $2 }')
-        username=$(echo $frmdata | awk 'BEGIN {FS="|" } { print $3 }')
-        password=$(echo $frmdata | awk 'BEGIN {FS="|" } { print $4 }')
-        # escape all special characters in password
-        password=$(echo $password | sed 's/[][`~!@#$%^&*()-_=+{}\|;:",<.>/?'"'"']/\\&/g')
-        security=$(echo $frmdata | awk 'BEGIN {FS="|" } { print $5 }')
-        console=$(echo $frmdata | awk 'BEGIN {FS="|" } { print $6 }')
-      fi
-      ;;
-  esac
-  
+  if [[ -z "$host" || -z "$username" || -z "$password" || "$username" = "{USERNAME}" || "$password" = "{PASSWORD}" || "$username" = "%7BUSERNAME%7D" || "$password" = "%7BPASSWORD%7D" ]]; then
+    frmdata=$(LANG=C yad --center --width=300 --title "Connect to remote computer" --focus-field=4 --align=right --form --field="Domain" "$domain" --field="Address" "$host" --field="Username" "$username" --field="Password":H "$password" --field="Security":CB 'rdp!tls!^nla!ext' --field="Admin Console":CHK | grep -v "WINDOW DECORATIONS RELOADED")
+    [ $? != 0 ] && exit 1
+    domain=$(echo $frmdata | awk 'BEGIN {FS="|" } { print $1 }')
+    host=$(echo $frmdata | awk 'BEGIN {FS="|" } { print $2 }')
+    username=$(echo $frmdata | awk 'BEGIN {FS="|" } { print $3 }')
+    password=$(echo $frmdata | awk 'BEGIN {FS="|" } { print $4 }')
+    # escape all special characters in password
+    password=$(echo $password | sed 's/[][`~!@#$%^&*()-_=+{}\|;:",<.>/?'"'"']/\\&/g')
+    security=$(echo $frmdata | awk 'BEGIN {FS="|" } { print $5 }')
+    console=$(echo $frmdata | awk 'BEGIN {FS="|" } { print $6 }')
+  fi
+
   # run the connection
   case $helper_cmd_rdp in
     rdesktop)
@@ -332,8 +337,36 @@ function helper_rdp() {
       helper_cmd="${helper_cmd_prepend}${helper_cmd_rdp} ${helper_cmd_opts} /v:${host}"
       ;;
     remmina)
-      helper_cmd_opts+=" -c"
-      helper_cmd="${helper_cmd_prepend}${helper_cmd_rdp} ${helper_cmd_opts} ${uri}"
+      izopen_conf_remmina_dir="$izopen_conf_dir/remmina"
+      [ ! -e "$izopen_conf_remmina_dir" ] && mkdir -p "$izopen_conf_remmina_dir"
+      connection_name="$(echo $host | sed -e 's/[^A-Za-z0-9_-]/_/g')"
+      izopen_conf_remmina_host="$izopen_conf_remmina_dir/${connection_name}.remmina"
+
+      function make_remmina_conf() {
+        cat <<EOF
+[remmina]
+name=$connection_name
+$([ $tunnel_use = 1 ] && echo -e "proxy_type=socks5\nproxy_hostname=localhost\nproxy_port=$tunnel_port_use")
+protocol=RDP
+resolution_mode=2
+viewmode=1
+scale=2
+ignore-tls-errors=1
+window_maximize=1
+server=$host
+$([ ! -z "$domain" ] && echo "domain=$domain")
+$([ ! -z "$username" ] && echo "username=$username")
+$([ ! -z "$password" ] && echo "password=$password")
+$(for remmina_conf in ${helper_cmd_conf_remmina}; do echo -e "$remmina_conf\n";done)
+EOF
+      }
+      
+      make_remmina_conf > "${izopen_conf_remmina_host}"
+      
+      # because this helper doesn't works via proxychains wrapper, don't use the $helper_cmd_prepend command
+      unset helper_cmd_prepend
+      
+      helper_cmd="${helper_cmd_prepend}${helper_cmd_rdp} ${helper_cmd_opts} -c ${izopen_conf_remmina_host}"
       ;;
   esac
 }
@@ -385,28 +418,28 @@ function helper_cifs() {
 # create tunnel
 function helper_tunnel_create() {
  # put specific address port forwarding port config file
- izopen_conf_socks_address="$izopen_conf_hosts_dir/$(echo $host | sed -e 's/[^A-Za-z0-9_-]/_/g').conf"
+ izopen_conf_socks_host="$izopen_conf_hosts_dir/$(echo $host | sed -e 's/[^A-Za-z0-9_-]/_/g').conf"
 
  # FIXME legacy config file path management
- izopen_conf_socks_address_legacy="$izopen_conf_dir/$(echo $host | sed -e 's/[^A-Za-z0-9_-]/_/g').conf"
- [ -e "$izopen_conf_socks_address_legacy" ] && mv "$izopen_conf_socks_address_legacy" "$izopen_conf_socks_address"
+ izopen_conf_socks_host_legacy="$izopen_conf_dir/$(echo $host | sed -e 's/[^A-Za-z0-9_-]/_/g').conf"
+ [ -e "$izopen_conf_socks_host_legacy" ] && mv "$izopen_conf_socks_host_legacy" "$izopen_conf_socks_host"
   
  # don't create a new tunnel if it's already opened
- if [ -f "$izopen_conf_socks_address" ]
+ if [ -f "$izopen_conf_socks_host" ]
   then
-    nc $nc_opts 127.0.0.1 $(cat "$izopen_conf_socks_address") </dev/null 2>/dev/null
+    nc $nc_opts 127.0.0.1 $(cat "$izopen_conf_socks_host") </dev/null 2>/dev/null
     [ $? != 0 ] && tunnel_create=1 || tunnel_create=0
  fi
 
     # import port configuration of remote address if exist
-    if [ -e "$izopen_conf_socks_address" ] ; then 
-      tunnel_port_create="$(cat "$izopen_conf_socks_address")"
+    if [ -e "$izopen_conf_socks_host" ] ; then 
+      tunnel_port_create="$(cat "$izopen_conf_socks_host")"
     fi
  
 # manage the proxychains tunnel configuration
  if [ "$tunnel_create" = 1 ]
   then
-    if [ ! -e "$izopen_conf_socks_address" ] ; then
+    if [ ! -e "$izopen_conf_socks_host" ] ; then
       # find first free usable port
       local tunnel_port
       tunnel_port=$tunnel_port_min
@@ -420,7 +453,7 @@ function helper_tunnel_create() {
         fi
       done
       # save the current used port for the specified host
-      echo $tunnel_port_create > "$izopen_conf_socks_address"
+      echo $tunnel_port_create > "$izopen_conf_socks_host"
     fi
 
     # make proxychains config if not exist
@@ -526,10 +559,15 @@ function uri_open() {
   local password="$uri_password"
   # try to obtain password from clipboard
   if [[ -z "$password" ]]; then
-    local clipboard=$(xsel)
+    local clipboard=$(xsel -b)
     # remove the password from the clipboard
     # FIXME using a workaround because xsel doesn't clean the clipboard contents I use a SPACE here. of course you can't use single space passwords here :)
-    echo -n " " | xsel -i
+    echo -n " " | xsel -i -b
+    
+    # debug
+    #echo clipboard: $clipboard    
+    #echo xsel: $(xsel -b)
+    
     [[ ! -z "$clipboard" || "$clipboard" != " " ]] && local password="$(echo $clipboard | tr -d [:cntrl:])" || unset password
   fi
   local host="$uri_host"
