@@ -1,63 +1,122 @@
 # izOpen
 izOpen is a multi protocol bash script to auto opening given URI and auto creating ssh reverse tunnel socks proxy
-designed from scratch to be used inside KeePassX as secure URI launcher
+izOpen was designed to be used as secure URI launcher in conjunction with any Password Manager (KeePassX, Browser Based etc...) 
 
 ## Features
-URI handling of: ssh, rdp, vnc, sftp, ftp, http, https, smb and cifs protocols
+supported URI schemas: ssh, rdp, vnc, sftp, ftp, http, https, smb, cifs
 
 ## Installation
-Copy this script into a user or system wide bin directory (suggestion: cp izopen ~/bin), must be into a PATH variable
+```
+mkdir -p ~/.local/bin
+wget https://raw.githubusercontent.com/ugoviti/izopen/master/izopen -O ~/.local/bin/izopen
+chmod 755 ~/.local/bin/izopen
+```
 
 ### OS Dependencies
-Download and install the latest version of KeePassX (https://www.keepassx.org).
 
-**KeePassX 0.x integration (Fedora <= 23, CentOS 5/6):**
-`yum install -y zenity kdelibs3 proxychains-ng keepassx`
+### Packages
+Download and install the latest version of KeePassXC (https://keepassxc.org/).
 
-into advanded settings of keepassx select "Custom Browser Command" and insert:
-`izopen %1`
+**KeePassXC 2.x integration (Fedora / CentOS 8):**
+`dnf install -y yad xfreerdp proxychains-ng keepassxc sshpass xclip`
 
-**KeePassX 2.x integration (Fedora >= 23):**
-`dnf install -y zenity kdelibs3 proxychains-ng keepassx`
+### Desktop Intergration
 
-create: ~/.local/share/applications/ssh-handler.desktop
+#### MIME associations
 ```
-[Desktop Entry]
-Type=Application
-Name=SSH Handler
-Exec=izopen %u
-Icon=utilities-terminal
+mkdir -p ~/.local/share/applications/
+ 
+echo "[Desktop Entry]
+Version=1.0
+Name=izOpen SSH Handler
+Comment=Open SSH connection to remote URI
+Exec=izopen %U
 StartupNotify=false
-MimeType=x-scheme-handler/ssh;
-```
-
-create: ~/.local/share/applications/rdp-handler.desktop
-```
-[Desktop Entry]
-Type=Application
-Name=RDP Handler
-Exec=izopen %u
+Terminal=false
 Icon=utilities-terminal
+Type=Application
+Categories=Network;
+MimeType=x-scheme-handler/ssh;" > ~/.local/share/applications/izopen-ssh-handler.desktop
+ 
+echo "[Desktop Entry]
+Version=1.0
+Name=izOpen TELNET Handler
+Comment=Open TELNET connection to remote URI
+Exec=izopen %U
 StartupNotify=false
-MimeType=x-scheme-handler/rdp;
+Terminal=false
+Icon=utilities-terminal
+Type=Application
+Categories=Network;
+MimeType=x-scheme-handler/telnet;" > ~/.local/share/applications/izopen-telnet-handler.desktop
+ 
+echo "[Desktop Entry]
+Version=1.0
+Name=izOpen RDP Handler
+Comment=Open RDP connection to remote URI
+Exec=izopen %U
+StartupNotify=false
+Terminal=false
+Icon=utilities-terminal
+Type=Application
+Categories=Network;
+MimeType=x-scheme-handler/rdp;" > ~/.local/share/applications/izopen-rdp-handler.desktop
+ 
+echo "[Desktop Entry]
+Version=1.0
+Name=izOpen VNC Handler
+Comment=Open VNC connection to remote URI
+Exec=izopen %U
+StartupNotify=false
+Terminal=false
+Icon=vinagre
+Type=Application
+Categories=Network;
+MimeType=x-scheme-handler/vnc;" > ~/.local/share/applications/izopen-vnc-handler.desktop
 ```
 
-Run:
+Register the new mime schemas:
 ```
-xdg-mime default ssh-handler.desktop x-scheme-handler/ssh
-xdg-mime default rdp-handler.desktop x-scheme-handler/rdp
+xdg-mime default izopen-ssh-handler.desktop x-scheme-handler/ssh
+xdg-mime default izopen-ssh-handler.desktop x-scheme-handler/sftp
+xdg-mime default izopen-telnet-handler.desktop x-scheme-handler/telnet
+xdg-mime default izopen-rdp-handler.desktop x-scheme-handler/rdp
+xdg-mime default izopen-vnc-handler.desktop x-scheme-handler/vnc
 ```
 
-## Usage:
-`izopen uri://username:password@hostname:port`
+Query the correct associations:
+```
+xdg-mime query default x-scheme-handler/ssh
+xdg-mime query default x-scheme-handler/telnet
+xdg-mime query default x-scheme-handler/rdp
+xdg-mime query default x-scheme-handler/vnc
+```
 
-### Examples
+Rebuild the mime database:
 ```
-izopen http://www.example.com
-izopen http://john:doe@www.example.com
-izopen ssh://root:supersecurepassword@www.example.com
-izopen smb://Administrator:password@server
-izopen rdp://DOMAIN/Administrator:password@server
+update-desktop-database ~/.local/share/applications/
+update-mime-database    ~/.local/share/mime/
 ```
+
+#### Open a New Browser Session using the reverse tunnel
+
+Create a new file: `~/.local/share/applications/izopen-http.desktop`
+```
+echo '#!/usr/bin/env xdg-open
+[Desktop Entry]
+Version=1.0
+Name=Web Browser via SSH tunnel
+Comment=Browse the Web via the specified local SSH tunnnel socks proxy port
+Exec=izopen -t
+StartupNotify=true
+Terminal=false
+Type=Application
+Icon=web-browser
+Categories=GTK;Network;WebBrowser;
+MimeType=text/html;x-scheme-handler/http;x-scheme-handler/https;' > ~/.local/share/applications/izopen-http.desktop
+```
+
+## Usage (with examples):
+`izopen -h`
 
 
