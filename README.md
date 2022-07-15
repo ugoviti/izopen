@@ -113,7 +113,7 @@ echo '#!/usr/bin/env xdg-open
 [Desktop Entry]
 Version=1.0
 Name=Web Browser via SSH tunnel
-Comment=Browse the Web via the specified local SSH tunnnel socks proxy port
+Comment=Browse the Web through the specified local SSH tunnnel socks proxy port
 Exec=izopen -t
 StartupNotify=true
 Terminal=false
