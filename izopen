@@ -30,17 +30,27 @@ VERSION_DATE="20220714"
 
 ## helper commands
 #########################################################################
-# default http/s browser
+# default command for SSH
+: ${helper_cmd_ssh:="ssh"}
+
+# default command for HTTP/S
 #: ${helper_cmd_http:="midori"}
 : ${helper_cmd_http:="google-chrome"}
 
-# default rdp connection software
+# default command for RDP
 #: ${helper_cmd_rdp:="rdesktop"}
 #: ${helper_cmd_rdp:="remmina"}
 : ${helper_cmd_rdp:="xfreerdp"}
 
-# default vnc connection software
+# # default command for VNC
 : ${helper_cmd_vnc:="vncviewer"}
+
+# # default command for FTP
+: ${helper_cmd_ftp:="xdg-open"}
+
+# # default command for SMB/CIFS
+: ${helper_cmd_smb:="xdg-open"}
+: ${helper_cmd_cifs:="xdg-open"}
 
 # default terminal app
 # define the command to use based on current desktop environment
@@ -63,7 +73,7 @@ fi
 #########################################################################
 : ${debug:=0}                # enable script debug
 : ${tunnel_create:=1}        # try to create a new ssh tunnel when connecting via ssh
-: ${tunnel_use:=0}           # use the existing ssh tunnel
+: ${tunnel_use:=1}           # use the existing ssh tunnel
 : ${tunnel_use_force:=0}     # always use the tunnel for every opened uri
 : ${tunnel_use_force_ssh:=0} # request the usage of estabilished ssh tunnel when connecting via ssh. this make possible to create a tunnel in a tunnel
 : ${tunnel_port_min:=2000}   # minimun tunnel port number to use
@@ -77,6 +87,9 @@ izopen_conf_socks_port_current="$izopen_conf_dir/socks_port_current.conf"
 
 izopen_conf_hosts_dir="$izopen_conf_dir/hosts"
 izopen_conf_proxychains_dir="$izopen_conf_dir/proxychains"
+
+# mandatory system commands
+system_commands="yad ssh sshpass xsel"
 
 # make dirs if not exist
 [ ! -e "$izopen_conf_dir" ] && mkdir -p "$izopen_conf_dir"
@@ -98,6 +111,7 @@ function make_default_config() {
 #helper_cmd_opts_terminal=" --noclose"
 
 # ssh options
+#helper_cmd_ssh="ssh"
 #helper_cmd_opts_ssh=" -z"
 
 ## rdp options
@@ -108,6 +122,12 @@ function make_default_config() {
 #helper_cmd_http="google-chrome"
 #helper_cmd_opts_http="--proxy-bypass-list='<-loopback>'"
 
+# others uri
+#helper_cmd_ftp="xdg-open"
+#helper_cmd_telnet="telnet"
+#helper_cmd_smb="xdg-open"
+#helper_cmd_cifs="xdg-open"
+
 ## misc options
 #debug=1
 #nc_opts="-z" 
@@ -115,7 +135,18 @@ function make_default_config() {
 EOF
 }
 
+function check_system_commands() {
+  # verify if all commands are installed in the system paths
+  for COMMAND in $@
+    do
+      which $COMMAND >/dev/null 2>&1
+      [ $? -ne 0 ] && echo "WARNING: the command '$COMMAND' doesn't exist in any path, please install it and retry"
+    done
+}
+
 function helper_terminal() {
+  check_system_commands $helper_cmd_terminal
+
   if [ "$tunnel_create" = 1 ]; then
      title="H:$host P:$tunnel_port_create [MASTER]"
    else
@@ -135,6 +166,7 @@ function helper_terminal() {
 }
 
 function helper_ssh() {
+  check_system_commands ssh
   helper_terminal
 
   #[ -z "$username" ] && read -p "username: " username;
@@ -151,8 +183,11 @@ function helper_ssh() {
   # if tunnel_create=1 add ssh options to create socks tunnel and compression
   [ "$tunnel_create" = 1 ] && helper_cmd_opts+=" -D $tunnel_port_create"
   
+  # password less login using sshpass
+  #[ ! -z "$password" ] && helper_cmd_prepend+=" sshpass -e "
+
   # set the final command
-  helper_cmd="${helper_cmd_terminal} $helper_cmd_opts_terminal -e \"${helper_cmd_prepend}ssh${helper_cmd_opts}\""
+  helper_cmd="${helper_cmd_terminal} $helper_cmd_opts_terminal -e \"${helper_cmd_prepend}${helper_cmd_ssh}${helper_cmd_opts}\""
 
   #######
   ## TEST
@@ -163,6 +198,7 @@ function helper_ssh() {
 }
 
 function helper_telnet() {
+  check_system_commands terminal
   helper_terminal
   
   #[ -z "$username" ] && read -p "username: " username;
@@ -178,6 +214,8 @@ function helper_telnet() {
 }
 
 function helper_http() {
+  check_system_commands $helper_cmd_http
+  
   # manage non mandatory cmd options
   helper_cmd_opts="${helper_cmd_opts_http}"
   
@@ -210,13 +248,16 @@ function helper_http() {
   esac
   
   # launch the uri
-  helper_cmd="${helper_cmd_prepend}${helper_cmd_http} ${helper_cmd_opts} \"${args}\""
+  helper_cmd="${helper_cmd_prepend}${helper_cmd_http} ${helper_cmd_opts} \"${uri}\""
 }
 
 function helper_rdp() {
+  check_system_commands $helper_cmd_rdp
+  
   # manage non mandatory cmd options
   helper_cmd_opts="${helper_cmd_opts_rdp}"
 
+  # obtain general info used by all rdp commands
   case $helper_cmd_rdp in
     rdesktop|xfreerdp)
       ## extract windows domain from username and convert to the right name
@@ -264,7 +305,7 @@ function helper_rdp() {
       [ -n "$password" ] && helper_cmd_opts+=" -p '$password'"
       [ -n "$port" ]     && port=":$port"
 
-      helper_cmd="${helper_cmd_prepend}rdesktop ${helper_cmd_opts} ${host}${port}"
+      helper_cmd="${helper_cmd_prepend}${helper_cmd_rdp} ${helper_cmd_opts} ${host}${port}"
       ;;
     xfreerdp)
       # FIXME: this function always use the default keyboard
@@ -282,17 +323,18 @@ function helper_rdp() {
       [ ! -z "$port" ]     && helper_cmd_opts+=" /port:$port"
       [ ! -z "$security" ] && helper_cmd_opts+=" /sec:$security"
       [ "$console" = "TRUE" ] && helper_cmd_opts+=" /console"
-
-      helper_cmd="${helper_cmd_prepend}xfreerdp ${helper_cmd_opts} /v:${host}"
+      
+      helper_cmd="${helper_cmd_prepend}${helper_cmd_rdp} ${helper_cmd_opts} /v:${host}"
       ;;
     remmina)
       helper_cmd_opts+=" -c"
-      helper_cmd="${helper_cmd_prepend}remmina ${helper_cmd_opts} ${uri}"
+      helper_cmd="${helper_cmd_prepend}${helper_cmd_rdp} ${helper_cmd_opts} ${uri}"
       ;;
   esac
 }
 
 function helper_vnc() {
+  check_system_commands $helper_cmd_vnc
   # manage non mandatory cmd options
   helper_cmd_opts="${helper_cmd_opts_vnc}"
   
@@ -303,34 +345,39 @@ function helper_vnc() {
 }
 
 function helper_sftp() {
-  #helper_cmd="xdg-open \"$args\""
-  helper_cmd="helper_ssh \"$args\""
+  check_system_commands ssh
+  #helper_cmd="xdg-open \"$uri\""
+  helper_cmd="helper_ssh \"$uri\""
 }
 
 function helper_ftp() {
-  helper_cmd="${helper_cmd_prepend}xdg-open \"$args\""
+  check_system_commands $helper_cmd_ftp
+  helper_cmd="${helper_cmd_prepend}${helper_cmd_ftp} ${helper_cmd_opts} \"${uri}\""
 }
 
 function helper_https() {
-  helper_http "$args"
+  helper_http "$uri"
 }
 
 function helper_about() {
-  helper_http "$args"
+  helper_http "$uri"
 }
 
 function helper_smb() {
-  helper_cmd="${helper_cmd_prepend}xdg-open \"$args\""
+  check_system_commands $helper_cmd_smb
+  helper_cmd="${helper_cmd_prepend}${helper_cmd_smb} ${helper_cmd_opts} \"${uri}\""
 }
 
 function helper_cifs() {
-  helper_cmd="${helper_cmd_prepend}xdg-open \"$args\""
+  check_system_commands $helper_cmd_cifs
+  helper_cmd="${helper_cmd_prepend}${helper_cmd_cifs} ${helper_cmd_opts} \"${uri}\""
 }
 
 # SYSTEM FUNCTIONS
 # DON'T TOUCH ANYTHING BELLOW
 #########################################################################
 
+# create tunnel
 function helper_tunnel_create() {
  # put specific address port forwarding port config file
  izopen_conf_socks_address="$izopen_conf_hosts_dir/$(echo $host | sed -e 's/[^A-Za-z0-9_-]/_/g').conf"
@@ -355,18 +402,20 @@ function helper_tunnel_create() {
  if [ "$tunnel_create" = 1 ]
   then
     if [ ! -e "$izopen_conf_socks_address" ] ; then
-        # find first free usable port
-        local tunnel_port
-        tunnel_port=$tunnel_port_min
+      # find first free usable port
+      local tunnel_port
+      tunnel_port=$tunnel_port_min
 
-        until [ ! -z "$tunnel_port_create" ]; do
-          izopen_conf_socks_proxy="$izopen_conf_proxychains_dir/$tunnel_port.conf"
-          if [ ! -e "$izopen_conf_socks_proxy" ];then
-              tunnel_port_create=$tunnel_port
-            else
-              let tunnel_port++
-          fi
-        done
+      until [ ! -z "$tunnel_port_create" ]; do
+        izopen_conf_socks_proxy="$izopen_conf_proxychains_dir/$tunnel_port.conf"
+        if [ ! -e "$izopen_conf_socks_proxy" ];then
+            tunnel_port_create=$tunnel_port
+          else
+            let tunnel_port++
+        fi
+      done
+      # save the current used port for the specified host
+      echo $tunnel_port_create > "$izopen_conf_socks_address"
     fi
 
     # make proxychains config if not exist
@@ -383,12 +432,25 @@ tcp_connect_time_out 8000
 socks5 127.0.0.1 $tunnel_port_create" > "$izopen_conf_socks_proxy"
     fi
 
-    # save the current used port for the specified host
-    echo $tunnel_port_create > "$izopen_conf_socks_address"
-
     # save the last used/reused port
     echo $tunnel_port_create > "$izopen_conf_socks_port_current"
  fi
+}
+
+# use al already opened tunnel
+function helper_tunnel_use() {
+  #tunnel_port_use=$(LANG=C yad --title "izOpen SSH Proxy" --entry --entry-text=$tunnel_port_use --text="Inserire la porta del Proxy Socks \nCompresa fra $tunnel_port_min e $tunnel_port_max\n" 2>/dev/null)
+
+  if [[ -e "$izopen_conf_socks_port_current" && -z "$tunnel_port_use" ]]; then
+    # read the latest tunnel port used if not specified
+    tunnel_port_use="$(cat "$izopen_conf_socks_port_current")"
+    
+    # request if we must use the last used port
+    tunnel_port_use=$(LANG=C yad --center --title "izOpen SSH Proxy" --entry --numeric --entry-text=$tunnel_port_use --text="<b>Inserire la porta del Proxy Socks</b> \nCompresa fra $tunnel_port_min e $tunnel_port_max\n" $tunnel_port_min $tunnel_port_max --timeout=10 --timeout-indicator=bottom | tr -d [:alpha:] | tr -d [:cntrl:] | tr -d [:space:])
+  fi 
+  
+  # save the last used port for later usage
+  [ ! -z "$tunnel_port_use" ] && echo $tunnel_port_use > "$izopen_conf_socks_port_current"
 }
 
 function helper_tunnel_manage() {
@@ -403,18 +465,7 @@ function helper_tunnel_manage() {
 
   # ask for a port if we want use a tunnel
   if [ $tunnel_use = 1 ] ; then
-    #tunnel_port_use=$(LANG=C yad --title "izOpen SSH Proxy" --entry --entry-text=$tunnel_port_use --text="Inserire la porta del Proxy Socks \nCompresa fra $tunnel_port_min e $tunnel_port_max\n" 2>/dev/null)
-
-    if [[ -e "$izopen_conf_socks_port_current" && -z "$tunnel_port_use" ]]; then
-      # read the latest tunnel port used if not specified
-      tunnel_port_use="$(cat "$izopen_conf_socks_port_current")"
-      
-      # request if we must use the last used port
-      tunnel_port_use=$(LANG=C yad --center --title "izOpen SSH Proxy" --entry --numeric --entry-text=$tunnel_port_use --text="<b>Inserire la porta del Proxy Socks</b> \nCompresa fra $tunnel_port_min e $tunnel_port_max\n" $tunnel_port_min $tunnel_port_max --timeout=10 --timeout-indicator=bottom | tr -d [:alpha:] | tr -d [:cntrl:] | tr -d [:space:])
-    fi 
-    
-    # save the current used port for later usage
-    [ ! -z "$tunnel_port_use" ] && echo $tunnel_port_use > "$izopen_conf_socks_port_current"
+      helper_tunnel_use
     else
       tunnel_port_use=""
   fi
@@ -460,20 +511,27 @@ EOF
 
 function uri_open() {
   local uri="$1"
-  local args="$@"
   shift
-  local opts="$@"
-  
+  local args="$@"
+
   # parse the uri
-  uri_parser $uri
-  local schema=$uri_schema
-  local username=$uri_username
-  local password=$uri_password
-  local host=$uri_host
-  local port=$uri_port
-  local path=$uri_path
+  uri_parser "$uri"
+  local schema="$uri_schema"
+  local username="$uri_username"
+  local password="$uri_password"
+  # try to obtain password from clipboard
+  if [ -z "$password" ]; then
+    local clipboard=$(xsel -ob)
+    [ ! -z "$clipboard" ] && local password="$(echo $clipboard | tr -d [:cntrl:])"
+    # pretty insecure, but the export is needed to avoid printing password into processlist
+    export SSHPASS=$password
+  fi
+  local host="$uri_host"
+  local port="$uri_port"
+  local path="$uri_path"
   # for safety logging create a new uri variable without the password
-  [ -z "$password" ] && local uri_safe=$uri || local uri_safe="$(echo "$uri" | sed "s/:$password//g")"
+  [ -z "$password" ] && local uri_safe="$uri" || local uri_safe="$(echo "$uri" | sed "s/:$(echo $password | sed 's/[][`~!@#$%^&*()-_=+{}\|;:",<.>/?'"'"']/\\&/g')//g")"
+
   uri_unset
   
   # force the usage of ssh tunnel for every openened url
@@ -489,21 +547,44 @@ function uri_open() {
   case $schema in
     ssh|telnet|rdp|vnc|sftp|ftp|http|https|about|smb|cifs|file)
       # create or use ssh tunnel if required
-      [[ "$tunnel_create" = 1 || "$tunnel_use" = 1 ]] && helper_tunnel_manage "$args"
-      # obtain commands to use to connect
-      helper_${schema} "$args"
-            
-      # log the command exection
-      print_log
+      case $schema in
+        ssh)
+          ;;
+        *)
+          # only ssh schema can be used to create a tunnel
+          tunnel_create=0
+          ;;
+      esac
+      # manage the use or creation of ssh tunnel
+      [[ "$tunnel_create" = 1 || "$tunnel_use" = 1 ]] && helper_tunnel_manage "$uri"
+      
+      TRY=1
+      TRYMAX=3
+      until [ $TRY -gt $TRYMAX ]; do
+        # obtain commands to use to connect
+        helper_${schema} "$uri"
+              
+        # log the command execution
+        print_log
 
-      # make the connection to the remote server
-      eval "$helper_cmd"
+        # make the connection to the remote server
+        eval "$helper_cmd"
+        RETVAL=$?
+        echo TRY:[$TRY/$TRYMAX] RETVAL:[$RETVAL]
+        
+        # freerdp ERRCONNECT_LOGON_FAILURE workaround. if the previous run contain a password error unset the password and retry
+        [ $RETVAL = 134 ] && unset password
+        
+        # retry or continue
+        [ $RETVAL = 0 ] && TRY=$TRYMAX || let TRY+=1
+      done
       
       # log the command output
-      [ $? != 0 ] && tail -n 30 "${izopen_log_file}" | sed -n "H; /^$(date '+%Y-%m-%d')/h; \${g;p;}" | LANG=C yad --center --width=1000 --height=500 --title "Connection Error" --button="Close":0 --text "Errors from ${izopen_log_file}" --text-info --fontname="Monospace 8"
+      [ $RETVAL != 0 ] && tail -n 350 "${izopen_log_file}" | sed -n "H; /^$(date '+%Y-%m-%d')/h; \${g;p;}" | LANG=C yad --center --width=1000 --height=500 --title "Connection Error" --button="Close":0 --text "Errors from ${izopen_log_file}" --text-info --fontname="Monospace 8"
       ;;
     *)
-      echo "ERROR: invalid URI specified: $args"
+      echo "ERROR: invalid URI specified: $uri"
+      return 1;
       ;;
   esac
 }
@@ -705,4 +786,10 @@ done
 # create defualt user config file if not exist
 [ ! -e "$izopen_conf_file" ] && make_default_config > "$izopen_conf_file"
 
+# check if all required system command are installed
+check_system_commands $system_commands
+
 uri_open "$uri" 2>&1 | tee -a "${izopen_log_file}" 2>&1
+
+# be sure to unset all dangerous variables
+trap "unset password SSHPASS" 0
