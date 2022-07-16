@@ -523,23 +523,23 @@ function helper_tunnel_manage() {
   [ -z $tunnel_port_use ] && tunnel_use=0
 }
 
-function print_header_log() {
+function print_log_header() {
   # print the parsed fields
   echo "----------------------------------------------------------------------------------------"
   echo "$(date +"%Y-%m-%d %H:%M:%S %Z") user:[$USER] uid:[$UID] uri:[$uri_safe]"
-  [ $debug = 1 ] && print_debug
+  [ $debug = 1 ] && print_log_debug
   echo "-- output ------------------------------------------------------------------------------"
 }
 
-function print_output_log() {
+function print_log_output() {
   tail -n 350 "${izopen_log_file}" | sed -n "H; /^$(date '+%Y-%m-%d')/h; \${g;p;}" | LANG=C yad --center --width=1000 --height=500 --title "Connection Error" --button="Close":0 --text "Errors from ${izopen_log_file}" --text-info --fontname="Monospace 8"
 }
 
-function print_footer_log() {
+function print_log_footer() {
   echo "----------------------------------------------------------------------------------------"
 }
 
-function print_debug() {
+function print_log_debug() {
   # print the parsed fields
   echo "-- debug -------------------------------------------------------------------------------"
   cat <<EOF
@@ -619,7 +619,7 @@ function uri_open() {
         helper_${schema} "$uri"
               
         # log the command execution
-        print_header_log
+        print_log_header
 
         # make the connection to the remote server
         eval "$helper_cmd"
@@ -636,8 +636,8 @@ function uri_open() {
       done
       
       # log the command output
-      [ $RETVAL != 0 ] && print_output_log
-      #print_footer_log
+      [ $RETVAL != 0 ] && print_log_output
+      #print_log_footer
       ;;
     *)
       echo "ERROR: invalid URI specified: $uri"
