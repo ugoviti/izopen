@@ -10,6 +10,7 @@ supported URI schemas: ssh, rdp, vnc, sftp, ftp, http, https, smb, cifs
 mkdir -p ~/.local/bin
 wget https://raw.githubusercontent.com/ugoviti/izopen/master/izopen -O ~/.local/bin/izopen
 chmod 755 ~/.local/bin/izopen
+echo 'PATH=$HOME/.local/bin:$PATH' >> ~/.bashrc
 ```
 
 ### Linux OS Dependencies
@@ -128,10 +129,22 @@ Add this desktop launcher into you Desktop Bar or Menu
 ## Windows OS Installation (Windows 10/11) (WORK IN PROGRESS)
 Open a Windows Command prompt as Administrator and run:
 ```
-wsl --install
+pacman -Syu
+pacman -S openssh sshpass openbsd-netcat vim mingw-w64-x86_64-putty mingw-w64-x86_64-freerdp
 ```
 
 Reboot the system (of course, as always on windows, you are so used to it :) )
+
+### Manage packages
+Update packages info: `pacman -Fy`
+Search for available package: `pacman -Ss NAME`
+Search for installed package: `pacman -Qs NAME`
+Print installed package info: `pacman -Qi NAME`
+Print installed package files list: `pacman -Ql NAME`
+Install package: `pacman -S NAME`
+
+Addintional info: https://wiki.archlinux.org/title/pacman
+
 
 ## Usage (with examples):
 `izopen -h`

@@ -28,54 +28,100 @@ VERSION_DATE="20220715"
 ##        dnf install -y yad kdelibs3 proxychains-ng keepassx
 
 
-## mandatory system commands
+## mandatory system commands based on operating system
 #########################################################################
-system_commands="yad nc xdg-open ssh sshpass telnet xsel proxychains xfreerdp remmina"
+# detect operating system and rewrite the system variables
+case "$OSTYPE" in
+  linux*)   env_os_linux ;; # running in linux env
+  solaris*) env_os_linux ;; # WIP
+  darwin*)  env_os_linux ;; # WIP
+  bsd*)     env_os_linux ;; # WIP
+  msys*)    env_os_windows ;; # running in windows env
+  cygwin*)  env_os_windows ;; # running in windows env
+  *)        env_os_linux ;; # always failback to linux env
+esac
 
-## helper commands
-#########################################################################
+function env_os_windows() {
+  system_commands="nc ssh sshpass telnet"
+  
+  ## helper commands
+  #########################################################################
 
-# default command for SSH
-: ${helper_cmd_ssh:="ssh"}
+  # default command for SSH
+  : ${helper_cmd_ssh:="ssh"}
 
-# default command for HTTP/S
-#: ${helper_cmd_http:="midori"}
-: ${helper_cmd_http:="google-chrome"}
+  # default command for HTTP/S
+  #: ${helper_cmd_http:="midori"}
+  : ${helper_cmd_http:="/c/Program\ Files/Google/Chrome/Application/chrome.exe"}
 
-# default command for RDP
-#: ${helper_cmd_rdp:="rdesktop"}
-#: ${helper_cmd_rdp:="xfreerdp"}
-: ${helper_cmd_rdp:="remmina"}
+  # default command for RDP
+  #: ${helper_cmd_rdp:="rdesktop"}
+  : ${helper_cmd_rdp:="xfreerdp"}
+  #: ${helper_cmd_rdp:="remmina"}
 
-# remmina specific, separe with a space every options
-: ${helper_cmd_conf_remmina:="drive=/tmp"}
+  # remmina specific, separe with a space every options
+  : ${helper_cmd_conf_remmina:="drive=/tmp"}
 
-# # default command for VNC
-: ${helper_cmd_vnc:="vncviewer"}
+  # # default command for VNC
+  : ${helper_cmd_vnc:="vncviewer"}
 
-# # default command for FTP
-: ${helper_cmd_ftp:="xdg-open"}
+  # # default command for FTP
+  : ${helper_cmd_ftp:="xdg-open"}
 
-# # default command for SMB/CIFS
-: ${helper_cmd_smb:="xdg-open"}
-: ${helper_cmd_cifs:="xdg-open"}
+  # # default command for SMB/CIFS
+  : ${helper_cmd_smb:="xdg-open"}
+  : ${helper_cmd_cifs:="xdg-open"}
+}
 
-# default terminal app
-# define the command to use based on current desktop environment
-if   [ "$XDG_CURRENT_DESKTOP" = "MATE" ]; then
-    : ${helper_cmd_terminal:="$(gsettings get org.mate.applications-terminal exec | tr -d \')"}
-elif [ "$XDG_CURRENT_DESKTOP" = "GNOME" ]; then
-    : ${helper_cmd_terminal:="$(gsettings get org.gnome.desktop.default-applications.terminal exec | tr -d \')"}
-elif [ "$XDG_CURRENT_DESKTOP" = "KDE" ]; then
-    #helper_cmd_terminal:="$(kreadconfig --file kdeglobals --group General --key TerminalApplication | tr -d \')"}
-    : ${helper_cmd_terminal:="konsole"}
-elif [ "$XDG_CURRENT_DESKTOP" = "XFCE" ]; then
-    : ${helper_cmd_terminal:="exo-open --launch TerminalEmulator"}
-elif [ "$XDG_CURRENT_DESKTOP" = "Pantheon" ]; then
-    : ${helper_cmd_terminal:="exo-open --launch TerminalEmulator"}
-  else
-    : ${helper_cmd_terminal:="xterm"}
-fi
+function env_os_linux() {
+  system_commands="yad nc xdg-open ssh sshpass telnet xsel proxychains xfreerdp remmina"
+
+  ## helper commands
+  #########################################################################
+
+  # default command for SSH
+  : ${helper_cmd_ssh:="ssh"}
+
+  # default command for HTTP/S
+  #: ${helper_cmd_http:="midori"}
+  : ${helper_cmd_http:="google-chrome"}
+
+  # default command for RDP
+  #: ${helper_cmd_rdp:="rdesktop"}
+  #: ${helper_cmd_rdp:="xfreerdp"}
+  : ${helper_cmd_rdp:="remmina"}
+
+  # remmina specific, separe with a space every options
+  : ${helper_cmd_conf_remmina:="drive=/tmp"}
+
+  # # default command for VNC
+  : ${helper_cmd_vnc:="vncviewer"}
+
+  # # default command for FTP
+  : ${helper_cmd_ftp:="xdg-open"}
+
+  # # default command for SMB/CIFS
+  : ${helper_cmd_smb:="xdg-open"}
+  : ${helper_cmd_cifs:="xdg-open"}
+
+  # default terminal app
+  # define the command to use based on current desktop environment
+  if   [ "$XDG_CURRENT_DESKTOP" = "MATE" ]; then
+      : ${helper_cmd_terminal:="$(gsettings get org.mate.applications-terminal exec | tr -d \')"}
+  elif [ "$XDG_CURRENT_DESKTOP" = "GNOME" ]; then
+      : ${helper_cmd_terminal:="$(gsettings get org.gnome.desktop.default-applications.terminal exec | tr -d \')"}
+  elif [ "$XDG_CURRENT_DESKTOP" = "KDE" ]; then
+      #helper_cmd_terminal:="$(kreadconfig --file kdeglobals --group General --key TerminalApplication | tr -d \')"}
+      : ${helper_cmd_terminal:="konsole"}
+  elif [ "$XDG_CURRENT_DESKTOP" = "XFCE" ]; then
+      : ${helper_cmd_terminal:="exo-open --launch TerminalEmulator"}
+  elif [ "$XDG_CURRENT_DESKTOP" = "Pantheon" ]; then
+      : ${helper_cmd_terminal:="exo-open --launch TerminalEmulator"}
+    else
+      : ${helper_cmd_terminal:="xterm"}
+  fi
+}
+
 
 ## variables
 #########################################################################
