@@ -5,14 +5,14 @@ izOpen was designed to be used as secure URI launcher in conjunction with any Pa
 ## Features
 supported URI schemas: ssh, rdp, vnc, sftp, ftp, http, https, smb, cifs
 
-## Installation
+## Linux OS Installation
 ```
 mkdir -p ~/.local/bin
 wget https://raw.githubusercontent.com/ugoviti/izopen/master/izopen -O ~/.local/bin/izopen
 chmod 755 ~/.local/bin/izopen
 ```
 
-### OS Dependencies
+### Linux OS Dependencies
 
 ### Packages
 Download and install the latest version of KeePassXC (https://keepassxc.org/).
@@ -124,6 +124,14 @@ MimeType=text/html;x-scheme-handler/http;x-scheme-handler/https;' > ~/.local/sha
 ```
 
 Add this desktop launcher into you Desktop Bar or Menu
+
+## Windows OS Installation (Windows 10/11) (WORK IN PROGRESS)
+Open a Windows Command prompt as Administrator and run:
+```
+wsl --install
+```
+
+Reboot the system (of course, as always on windows, you are so used to it :) )
 
 ## Usage (with examples):
 `izopen -h`
