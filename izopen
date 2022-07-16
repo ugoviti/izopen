@@ -36,30 +36,39 @@ function env_os_windows() {
   
   ## helper commands
   #########################################################################
-  # terminal gui command
-  : ${helper_terminal_name:="mintty"}
-
   # default command for SSH
   : ${helper_ssh_name:="ssh"}
+  : ${helper_ssh_cmd:="$helper_ssh_name"}
+
+  # default command for SFTP
+  : ${helper_sftp_name:="ssh"}
+  : ${helper_sftp_cmd:="$helper_sftp_name"}
 
   # default command for HTTP/S
-  #: ${helper_http_name:="midori"}
   : ${helper_http_name:="google-chrome"}
   : ${helper_http_cmd:="/c/Program\ Files/Google/Chrome/Application/chrome.exe"}
 
   # default command for RDP
-  #: ${helper_rdp_name:="rdesktop"}
   : ${helper_rdp_name:="xfreerdp"}
+  : ${helper_rdp_cmd:="$helper_rdp_name"}
 
   # # default command for VNC
   : ${helper_vnc_name:="vncviewer"}
+  : ${helper_vnc_cmd:="$helper_vnc_name"}
 
   # # default command for FTP
   : ${helper_ftp_name:="xdg-open"}
+  : ${helper_ftp_cmd:="$helper_ftp_name"}
 
   # # default command for SMB/CIFS
   : ${helper_smb_name:="xdg-open"}
+  : ${helper_smb_cmd:="$helper_smb_name"}
   : ${helper_cifs_name:="xdg-open"}
+  : ${helper_cifs_cmd:="$helper_cifs_name"}
+  
+  # default terminal app
+  : ${helper_terminal_name:="mintty"}
+  : ${helper_terminal_cmd:="$helper_terminal_name"}
 }
 
 function env_os_linux() {
@@ -72,6 +81,10 @@ function env_os_linux() {
   # default command for SSH
   : ${helper_ssh_name:="ssh"}
   : ${helper_ssh_cmd:="$helper_ssh_name"}
+
+  # default command for SFTP
+  : ${helper_sftp_name:="ssh"}
+  : ${helper_sftp_cmd:="$helper_sftp_name"}
 
   # default command for HTTP/S
   #: ${helper_http_cmd:="midori"}
@@ -209,8 +222,13 @@ function check_system_commands() {
     done
 }
 
+function check_helper_cmd() {
+  which "$@" >/dev/null 2>&1
+  [ $? -ne 0 ] && echo "WARNING: the command '$@' doesn't exist in any path, please install it and retry"
+}
+
 function helper_terminal() {
-  check_system_commands $helper_terminal_cmd
+  check_helper_cmd "$helper_terminal_cmd"
 
   if [ "$tunnel_create" = 1 ]; then
      title="H:$host P:$tunnel_port_create [MASTER]"
@@ -218,7 +236,7 @@ function helper_terminal() {
      title="H:$host P:$tunnel_port_create [SLAVE]"
   fi
 
-  case $helper_terminal_cmd in
+  case $helper_terminal_name in
     konsole)
       #helper_terminal_cmd_opts="-p tabtitle='(%u) %H'"
       helper_terminal_cmd_opts+=" -p tabtitle='$title'"
@@ -235,7 +253,7 @@ function helper_terminal() {
 }
 
 function helper_ssh() {
-  check_system_commands ssh
+  check_helper_cmd "$helper_ssh_cmd"
   helper_terminal
 
   #[ -z "$username" ] && read -p "username: " username;
@@ -277,14 +295,14 @@ function helper_ssh() {
 }
 
 function helper_telnet() {
-  check_system_commands terminal
+  check_helper_cmd "$helper_telnet_cmd"
   helper_terminal
   
   #[ -z "$username" ] && read -p "username: " username;
   #[ -z "$password" ] && read -p "password: " password;
   
   # manage non mandatory cmd options
-  helper_cmd_opts="${helper_cmd_opts_telnet}"
+  helper_cmd_opts="${helper_telnet_cmd_opts}"
   helper_cmd_opts+=" $host"
   [ -n "$port" ] && helper_cmd_opts+=" $port"
 
@@ -293,13 +311,13 @@ function helper_telnet() {
 }
 
 function helper_http() {
-  check_system_commands $helper_http_cmd
+  check_helper_cmd "$helper_http_cmd"
   
   # manage non mandatory cmd options
   helper_cmd_opts="${helper_http_cmd_opts}"
   
   # run the connection
-  case $helper_http_cmd in
+  case $helper_http_name in
     google-chrome)
       # open the browser with this options only on tunnel connection
       if [ $tunnel_use = 1 ]; then
@@ -327,11 +345,11 @@ function helper_http() {
   esac
   
   # launch the uri
-  helper_cmd="${helper_cmd_prepend}${helper_http_cmd} ${helper_cmd_opts} \"${uri}\""
+  helper_cmd="${helper_cmd_prepend}${helper_http_cmd} ${helper_cmd_opts} ${uri}"
 }
 
 function helper_rdp() {
-  check_system_commands $helper_rdp_cmd
+  check_helper_cmd "$helper_rdp_cmd"
   
   # manage non mandatory cmd options
   helper_cmd_opts="${helper_rdp_cmd_opts}"
@@ -372,7 +390,7 @@ function helper_rdp() {
   fi
 
   # run the connection
-  case $helper_rdp_cmd in
+  case $helper_rdp_name in
     rdesktop)
       helper_cmd_opts+=" -k it -g 1280x780"
       [ -n "$domain" ]   && helper_cmd_opts+=" -d '$domain'"
@@ -437,7 +455,7 @@ EOF
 }
 
 function helper_vnc() {
-  check_system_commands $helper_vnc_cmd
+  check_helper_cmd "$helper_vnc_cmd"
   # manage non mandatory cmd options
   helper_cmd_opts="${helper_vnc_cmd_opts}"
   
@@ -448,13 +466,13 @@ function helper_vnc() {
 }
 
 function helper_sftp() {
-  check_system_commands ssh
+  check_helper_cmd "$helper_sftp_cmd"
   #helper_cmd="xdg-open \"$uri\""
   helper_cmd="helper_ssh \"$uri\""
 }
 
 function helper_ftp() {
-  check_system_commands $helper_ftp_cmd
+  check_helper_cmd "$helper_ftp_cmd"
   helper_cmd="${helper_cmd_prepend}${helper_ftp_cmd} ${helper_cmd_opts} \"${uri}\""
 }
 
@@ -467,12 +485,12 @@ function helper_about() {
 }
 
 function helper_smb() {
-  check_system_commands $helper_smb_cmd
+  check_helper_cmd "$helper_smb_cmd"
   helper_cmd="${helper_cmd_prepend}${helper_smb_cmd} ${helper_cmd_opts} \"${uri}\""
 }
 
 function helper_cifs() {
-  check_system_commands $helper_cifs_cmd
+  check_helper_cmd "$helper_cifs_cmd"
   helper_cmd="${helper_cmd_prepend}${helper_cifs_cmd} ${helper_cmd_opts} \"${uri}\""
 }
 
