@@ -30,7 +30,97 @@ VERSION_DATE="20220715"
 
 ## mandatory system commands based on operating system
 #########################################################################
-# detect operating system and rewrite the system variables
+function env_os_windows() {
+  izopen_os_env="windows"
+  system_commands="nc ssh sshpass telnet yad"
+  
+  ## helper commands
+  #########################################################################
+  # terminal gui command
+  : ${helper_terminal_name:="mintty"}
+
+  # default command for SSH
+  : ${helper_ssh_name:="ssh"}
+
+  # default command for HTTP/S
+  #: ${helper_http_name:="midori"}
+  : ${helper_http_name:="google-chrome"}
+  : ${helper_http_cmd:="/c/Program\ Files/Google/Chrome/Application/chrome.exe"}
+
+  # default command for RDP
+  #: ${helper_rdp_name:="rdesktop"}
+  : ${helper_rdp_name:="xfreerdp"}
+
+  # # default command for VNC
+  : ${helper_vnc_name:="vncviewer"}
+
+  # # default command for FTP
+  : ${helper_ftp_name:="xdg-open"}
+
+  # # default command for SMB/CIFS
+  : ${helper_smb_name:="xdg-open"}
+  : ${helper_cifs_name:="xdg-open"}
+}
+
+function env_os_linux() {
+  izopen_os_env="linux"
+  system_commands="yad nc xdg-open ssh sshpass telnet xsel proxychains xfreerdp remmina"
+
+  ## helper commands
+  #########################################################################
+
+  # default command for SSH
+  : ${helper_ssh_name:="ssh"}
+  : ${helper_ssh_cmd:="$helper_ssh_name"}
+
+  # default command for HTTP/S
+  #: ${helper_http_cmd:="midori"}
+  : ${helper_http_name:="google-chrome"}
+  : ${helper_http_cmd:="$helper_http_name"}
+
+  # default command for RDP
+  #: ${helper_rdp_name:="rdesktop"}
+  #: ${helper_rdp_name:="xfreerdp"}
+  : ${helper_rdp_name:="remmina"}
+  : ${helper_rdp_cmd:="$helper_rdp_name"}
+
+  # remmina specific, separe with a space every options
+  : ${helper_rdp_cmd_conf_remmina:="drive=/tmp"}
+
+  # # default command for VNC
+  : ${helper_vnc_name:="vncviewer"}
+  : ${helper_vnc_cmd:="$helper_vnc_name"}
+
+  # # default command for FTP
+  : ${helper_ftp_name:="xdg-open"}
+  : ${helper_ftp_cmd:="$helper_ftp_name"}
+
+  # # default command for SMB/CIFS
+  : ${helper_smb_name:="xdg-open"}
+  : ${helper_smb_cmd:="$helper_smb_name"}
+  : ${helper_cifs_name:="xdg-open"}
+  : ${helper_cifs_cmd:="$helper_cifs_name"}
+
+  # default terminal app
+  # define the command to use based on current desktop environment
+  if   [ "$XDG_CURRENT_DESKTOP" = "MATE" ]; then
+      : ${helper_terminal_name:="$(gsettings get org.mate.applications-terminal exec | tr -d \')"}
+  elif [ "$XDG_CURRENT_DESKTOP" = "GNOME" ]; then
+      : ${helper_terminal_name:="$(gsettings get org.gnome.desktop.default-applications.terminal exec | tr -d \')"}
+  elif [ "$XDG_CURRENT_DESKTOP" = "KDE" ]; then
+      #helper_terminal_cmd:="$(kreadconfig --file kdeglobals --group General --key TerminalApplication | tr -d \')"}
+      : ${helper_terminal_name:="konsole"}
+  elif [ "$XDG_CURRENT_DESKTOP" = "XFCE" ]; then
+      : ${helper_terminal_name:="exo-open --launch TerminalEmulator"}
+  elif [ "$XDG_CURRENT_DESKTOP" = "Pantheon" ]; then
+      : ${helper_terminal_name:="exo-open --launch TerminalEmulator"}
+    else
+      : ${helper_terminal_name:="xterm"}
+  fi
+  : ${helper_terminal_cmd:="$helper_terminal_name"}
+}
+
+# detect operating system and import the right system variables
 case "$OSTYPE" in
   linux*)   env_os_linux ;; # running in linux env
   solaris*) env_os_linux ;; # WIP
@@ -40,88 +130,6 @@ case "$OSTYPE" in
   cygwin*)  env_os_windows ;; # running in windows env
   *)        env_os_linux ;; # always failback to linux env
 esac
-
-function env_os_windows() {
-  system_commands="nc ssh sshpass telnet"
-  
-  ## helper commands
-  #########################################################################
-
-  # default command for SSH
-  : ${helper_cmd_ssh:="ssh"}
-
-  # default command for HTTP/S
-  #: ${helper_cmd_http:="midori"}
-  : ${helper_cmd_http:="/c/Program\ Files/Google/Chrome/Application/chrome.exe"}
-
-  # default command for RDP
-  #: ${helper_cmd_rdp:="rdesktop"}
-  : ${helper_cmd_rdp:="xfreerdp"}
-  #: ${helper_cmd_rdp:="remmina"}
-
-  # remmina specific, separe with a space every options
-  : ${helper_cmd_conf_remmina:="drive=/tmp"}
-
-  # # default command for VNC
-  : ${helper_cmd_vnc:="vncviewer"}
-
-  # # default command for FTP
-  : ${helper_cmd_ftp:="xdg-open"}
-
-  # # default command for SMB/CIFS
-  : ${helper_cmd_smb:="xdg-open"}
-  : ${helper_cmd_cifs:="xdg-open"}
-}
-
-function env_os_linux() {
-  system_commands="yad nc xdg-open ssh sshpass telnet xsel proxychains xfreerdp remmina"
-
-  ## helper commands
-  #########################################################################
-
-  # default command for SSH
-  : ${helper_cmd_ssh:="ssh"}
-
-  # default command for HTTP/S
-  #: ${helper_cmd_http:="midori"}
-  : ${helper_cmd_http:="google-chrome"}
-
-  # default command for RDP
-  #: ${helper_cmd_rdp:="rdesktop"}
-  #: ${helper_cmd_rdp:="xfreerdp"}
-  : ${helper_cmd_rdp:="remmina"}
-
-  # remmina specific, separe with a space every options
-  : ${helper_cmd_conf_remmina:="drive=/tmp"}
-
-  # # default command for VNC
-  : ${helper_cmd_vnc:="vncviewer"}
-
-  # # default command for FTP
-  : ${helper_cmd_ftp:="xdg-open"}
-
-  # # default command for SMB/CIFS
-  : ${helper_cmd_smb:="xdg-open"}
-  : ${helper_cmd_cifs:="xdg-open"}
-
-  # default terminal app
-  # define the command to use based on current desktop environment
-  if   [ "$XDG_CURRENT_DESKTOP" = "MATE" ]; then
-      : ${helper_cmd_terminal:="$(gsettings get org.mate.applications-terminal exec | tr -d \')"}
-  elif [ "$XDG_CURRENT_DESKTOP" = "GNOME" ]; then
-      : ${helper_cmd_terminal:="$(gsettings get org.gnome.desktop.default-applications.terminal exec | tr -d \')"}
-  elif [ "$XDG_CURRENT_DESKTOP" = "KDE" ]; then
-      #helper_cmd_terminal:="$(kreadconfig --file kdeglobals --group General --key TerminalApplication | tr -d \')"}
-      : ${helper_cmd_terminal:="konsole"}
-  elif [ "$XDG_CURRENT_DESKTOP" = "XFCE" ]; then
-      : ${helper_cmd_terminal:="exo-open --launch TerminalEmulator"}
-  elif [ "$XDG_CURRENT_DESKTOP" = "Pantheon" ]; then
-      : ${helper_cmd_terminal:="exo-open --launch TerminalEmulator"}
-    else
-      : ${helper_cmd_terminal:="xterm"}
-  fi
-}
-
 
 ## variables
 #########################################################################
@@ -160,30 +168,30 @@ izopen_log_file="$izopen_conf_dir/izopen.log"
 function make_default_config() {
   cat <<EOF
 ## terminal options
-#helper_cmd_terminal="konsole"
-#helper_cmd_opts_terminal=" --noclose"
+#helper_terminal_cmd="konsole"
+#helper_terminal_cmd_opts=" --noclose"
 
 # ssh options
-#helper_cmd_ssh="ssh"
-#helper_cmd_opts_ssh=" -z"
+#helper_ssh_cmd="ssh"
+#helper_ssh_cmd_opts=" -z"
 
 ## rdp options (remmina)
-#helper_cmd_rdp="remmina"
-#helper_cmd_conf_remmina="drive=/tmp"
+#helper_rdp_cmd="remmina"
+#helper_rdp_cmd_conf_remmina="drive=/tmp"
 
 ## rdp options (freerdp)
-#helper_cmd_rdp="xfreerdp"
-#helper_cmd_opts_rdp="/drive:/tmp"
+#helper_rdp_cmd="xfreerdp"
+#helper_rdp_cmd_opts="/drive:/tmp"
 
 ## browser options
-#helper_cmd_http="google-chrome"
-#helper_cmd_opts_http="--proxy-bypass-list='<-loopback>'"
+#helper_http_cmd="google-chrome"
+#helper_http_cmd_opts="--proxy-bypass-list='<-loopback>'"
 
 # others uri
-#helper_cmd_ftp="xdg-open"
-#helper_cmd_telnet="telnet"
-#helper_cmd_smb="xdg-open"
-#helper_cmd_cifs="xdg-open"
+#helper_ftp_cmd="xdg-open"
+#helper_telnet_cmd="telnet"
+#helper_smb_cmd="xdg-open"
+#helper_cifs_cmd="xdg-open"
 
 ## misc options
 #debug=1
@@ -196,13 +204,13 @@ function check_system_commands() {
   # verify if all commands are installed in the system paths
   for COMMAND in $@
     do
-      which $COMMAND >/dev/null 2>&1
+      which "$COMMAND" >/dev/null 2>&1
       [ $? -ne 0 ] && echo "WARNING: the command '$COMMAND' doesn't exist in any path, please install it and retry"
     done
 }
 
 function helper_terminal() {
-  check_system_commands $helper_cmd_terminal
+  check_system_commands $helper_terminal_cmd
 
   if [ "$tunnel_create" = 1 ]; then
      title="H:$host P:$tunnel_port_create [MASTER]"
@@ -210,15 +218,18 @@ function helper_terminal() {
      title="H:$host P:$tunnel_port_create [SLAVE]"
   fi
 
-  case $helper_cmd_terminal in
+  case $helper_terminal_cmd in
     konsole)
-      #helper_cmd_opts_terminal="-p tabtitle='(%u) %H'"
-      helper_cmd_opts_terminal+=" -p tabtitle='$title'"
-      helper_cmd_opts_terminal+=" -p RemoteTabTitleFormat='$title'"
-      #helper_cmd_opts_terminal+=" --noclose"
+      #helper_terminal_cmd_opts="-p tabtitle='(%u) %H'"
+      helper_terminal_cmd_opts+=" -p tabtitle='$title'"
+      helper_terminal_cmd_opts+=" -p RemoteTabTitleFormat='$title'"
+      #helper_terminal_cmd_opts+=" --noclose"
+      ;;
+    mintty)
+      helper_terminal_cmd_opts="-T \"$title\""
       ;;
     *)
-      helper_cmd_opts_terminal="--title \"$title\""
+      helper_terminal_cmd_opts="--title \"$title\""
       ;;
   esac
 }
@@ -231,7 +242,7 @@ function helper_ssh() {
   #[ -z "$password" ] && read -p "password: " password;
   
   # manage non mandatory cmd options
-  helper_cmd_opts="${helper_cmd_opts_ssh}"  
+  helper_cmd_opts="${helper_ssh_cmd_opts}"  
   # add username, otherwise use the current logged in user
   [ ! -z "$username" ] && helper_cmd_opts+=" $username@$host" || helper_cmd_opts+=" $host"
   # add the port if not default 22
@@ -241,22 +252,28 @@ function helper_ssh() {
   # if tunnel_create=1 add ssh options to create socks tunnel and compression
   [ "$tunnel_create" = 1 ] && helper_cmd_opts+=" -D $tunnel_port_create"
   
-  # password less login using sshpass
-  if [ ! -z "$password" ]; then
-    # pretty insecure, but the export is needed to avoid printing password into processlist
-    export SSHPASS=$password
-    helper_cmd_prepend+="sshpass -e "
+  # FIXME don't use sshpass outside linux environment because this bug:
+  # https://github.com/msys2/MSYS2-packages/issues/2458
+  if [ "$izopen_os_env" = "linux" ]; then
+    # password less login using sshpass
+    if [ ! -z "$password" ]; then
+      # pretty insecure, but the export is needed to avoid printing password into processlist
+      export SSHPASS=$password
+      helper_cmd_prepend+="sshpass -e "
+      # debug
+      #echo SSHPASS: $SSHPASS
+    fi
   fi
 
   # set the final command
-  helper_cmd="${helper_cmd_terminal} $helper_cmd_opts_terminal -e \"${helper_cmd_prepend}${helper_cmd_ssh}${helper_cmd_opts}\""
+  helper_cmd="${helper_terminal_cmd} $helper_terminal_cmd_opts -e ${helper_cmd_prepend}${helper_ssh_cmd}${helper_cmd_opts}"
 
   #######
   ## TEST
   #######
   ## colorized prompt:
   #helper_cmd="gnome-terminal -e \"ssh $([ -n "$port" ] && echo "-p $port") $username@$host $helper_cmd_opts\""
-  #helper_cmd_ssh_opts="--title \"export PS1='\e[0;31m[\u@\h \W]\$ \e[m '; exec bash\""
+  #helper_ssh_cmd_opts="--title \"export PS1='\e[0;31m[\u@\h \W]\$ \e[m '; exec bash\""
 }
 
 function helper_telnet() {
@@ -272,17 +289,17 @@ function helper_telnet() {
   [ -n "$port" ] && helper_cmd_opts+=" $port"
 
   # set the final command
-  helper_cmd="${helper_cmd_terminal} $helper_cmd_opts_terminal -e \"${helper_cmd_prepend}telnet${helper_cmd_opts}\""
+  helper_cmd="${helper_terminal_cmd} $helper_terminal_cmd_opts -e ${helper_cmd_prepend}telnet${helper_cmd_opts}"
 }
 
 function helper_http() {
-  check_system_commands $helper_cmd_http
+  check_system_commands $helper_http_cmd
   
   # manage non mandatory cmd options
-  helper_cmd_opts="${helper_cmd_opts_http}"
+  helper_cmd_opts="${helper_http_cmd_opts}"
   
   # run the connection
-  case $helper_cmd_http in
+  case $helper_http_cmd in
     google-chrome)
       # open the browser with this options only on tunnel connection
       if [ $tunnel_use = 1 ]; then
@@ -305,19 +322,19 @@ function helper_http() {
       helper_cmd_opts+=" -c \"$izopen_conf_dir/midori/$tunnel_port_use\""
       ;;
     *)
-      helper_cmd_http="xdg-open"
+      helper_http_cmd="xdg-open"
       ;;
   esac
   
   # launch the uri
-  helper_cmd="${helper_cmd_prepend}${helper_cmd_http} ${helper_cmd_opts} \"${uri}\""
+  helper_cmd="${helper_cmd_prepend}${helper_http_cmd} ${helper_cmd_opts} \"${uri}\""
 }
 
 function helper_rdp() {
-  check_system_commands $helper_cmd_rdp
+  check_system_commands $helper_rdp_cmd
   
   # manage non mandatory cmd options
-  helper_cmd_opts="${helper_cmd_opts_rdp}"
+  helper_cmd_opts="${helper_rdp_cmd_opts}"
 
   # obtain general info used by all rdp commands
   ## extract windows domain from username and convert to the right name
@@ -355,7 +372,7 @@ function helper_rdp() {
   fi
 
   # run the connection
-  case $helper_cmd_rdp in
+  case $helper_rdp_cmd in
     rdesktop)
       helper_cmd_opts+=" -k it -g 1280x780"
       [ -n "$domain" ]   && helper_cmd_opts+=" -d '$domain'"
@@ -363,7 +380,7 @@ function helper_rdp() {
       [ -n "$password" ] && helper_cmd_opts+=" -p '$password'"
       [ -n "$port" ]     && port=":$port"
 
-      helper_cmd="${helper_cmd_prepend}${helper_cmd_rdp} ${helper_cmd_opts} ${host}${port}"
+      helper_cmd="${helper_cmd_prepend}${helper_rdp_cmd} ${helper_cmd_opts} ${host}${port}"
       ;;
     xfreerdp)
       # FIXME: this function always use the default keyboard
@@ -382,7 +399,7 @@ function helper_rdp() {
       [ ! -z "$security" ] && helper_cmd_opts+=" /sec:$security"
       [ "$console" = "TRUE" ] && helper_cmd_opts+=" /console"
       
-      helper_cmd="${helper_cmd_prepend}${helper_cmd_rdp} ${helper_cmd_opts} /v:${host}"
+      helper_cmd="${helper_cmd_prepend}${helper_rdp_cmd} ${helper_cmd_opts} /v:${host}"
       ;;
     remmina)
       izopen_conf_remmina_dir="$izopen_conf_dir/remmina"
@@ -405,7 +422,7 @@ server=$host
 $([ ! -z "$domain" ] && echo "domain=$domain")
 $([ ! -z "$username" ] && echo "username=$username")
 $([ ! -z "$password" ] && echo "password=$password")
-$(for remmina_conf in ${helper_cmd_conf_remmina}; do echo -e "$remmina_conf\n";done)
+$(for remmina_conf in ${helper_rdp_cmd_conf_remmina}; do echo -e "$remmina_conf\n";done)
 EOF
       }
       
@@ -414,20 +431,20 @@ EOF
       # because this helper doesn't works via proxychains wrapper, don't use the $helper_cmd_prepend command
       unset helper_cmd_prepend
       
-      helper_cmd="${helper_cmd_prepend}${helper_cmd_rdp} ${helper_cmd_opts} -c ${izopen_conf_remmina_host}"
+      helper_cmd="${helper_cmd_prepend}${helper_rdp_cmd} ${helper_cmd_opts} -c ${izopen_conf_remmina_host}"
       ;;
   esac
 }
 
 function helper_vnc() {
-  check_system_commands $helper_cmd_vnc
+  check_system_commands $helper_vnc_cmd
   # manage non mandatory cmd options
-  helper_cmd_opts="${helper_cmd_opts_vnc}"
+  helper_cmd_opts="${helper_vnc_cmd_opts}"
   
   # vnc doesn't support username and actually don't accept the password. use the gnome keyring instead for this
   #helper_cmd="vinagre $schema://$host$([ -n $port ] && echo ":$port")"
   [ -n $port ] && helper_cmd_opts+=":$port"
-  helper_cmd="$helper_cmd_vnc ${host}${helper_cmd_opts}"
+  helper_cmd="$helper_vnc_cmd ${host}${helper_cmd_opts}"
 }
 
 function helper_sftp() {
@@ -437,8 +454,8 @@ function helper_sftp() {
 }
 
 function helper_ftp() {
-  check_system_commands $helper_cmd_ftp
-  helper_cmd="${helper_cmd_prepend}${helper_cmd_ftp} ${helper_cmd_opts} \"${uri}\""
+  check_system_commands $helper_ftp_cmd
+  helper_cmd="${helper_cmd_prepend}${helper_ftp_cmd} ${helper_cmd_opts} \"${uri}\""
 }
 
 function helper_https() {
@@ -450,13 +467,13 @@ function helper_about() {
 }
 
 function helper_smb() {
-  check_system_commands $helper_cmd_smb
-  helper_cmd="${helper_cmd_prepend}${helper_cmd_smb} ${helper_cmd_opts} \"${uri}\""
+  check_system_commands $helper_smb_cmd
+  helper_cmd="${helper_cmd_prepend}${helper_smb_cmd} ${helper_cmd_opts} \"${uri}\""
 }
 
 function helper_cifs() {
-  check_system_commands $helper_cmd_cifs
-  helper_cmd="${helper_cmd_prepend}${helper_cmd_cifs} ${helper_cmd_opts} \"${uri}\""
+  check_system_commands $helper_cifs_cmd
+  helper_cmd="${helper_cmd_prepend}${helper_cifs_cmd} ${helper_cmd_opts} \"${uri}\""
 }
 
 # SYSTEM FUNCTIONS
@@ -616,13 +633,18 @@ function uri_open() {
   local password="$uri_password"
   # try to obtain password from clipboard
   if [[ -z "$password" ]]; then
-    local clipboard=$(xsel -b)
-    # remove the password from the clipboard
-    # FIXME using a workaround because xsel doesn't clean the clipboard contents I use a SPACE here. of course you can't use single space passwords here :)
-    echo -n " " | xsel -i -b
-    
+    if [ "$izopen_os_env" = "windows" ]; then
+        local clipboard=$(cat /dev/clipboard)
+        echo -n " " > /dev/clipboard
+      else
+        local clipboard=$(xsel -b)
+        # remove the password from the clipboard
+        # FIXME using a workaround because xsel doesn't clean the clipboard contents I use a SPACE here. of course you can't use single space passwords here :)
+        echo -n " " | xsel -i -b
+    fi
+
     # debug
-    #echo clipboard: $clipboard    
+    #echo clipboard: $clipboard
     #echo xsel: $(xsel -b)
     
     [[ ! -z "$clipboard" || "$clipboard" != " " ]] && local password="$(echo $clipboard | tr -d [:cntrl:])" || unset password
@@ -634,7 +656,7 @@ function uri_open() {
   [ -z "$password" ] && local uri_safe="$uri" || local uri_safe="$(echo "$uri" | sed "s/:$(echo $password | sed 's/[][`~!@#$%^&*()-_=+{}\|;:",<.>/?'"'"']/\\&/g')//g")"
 
   uri_unset
-  
+    
   # force the usage of ssh tunnel for every openened url
   [ $tunnel_use_force = 1 ] && tunnel_use=1
   
