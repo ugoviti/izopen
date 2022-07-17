@@ -211,13 +211,13 @@ function check_system_commands() {
   # verify if all commands are installed in the system paths
   for COMMAND in $@
     do
-      which "$COMMAND" >/dev/null 2>&1
+      which $COMMAND >/dev/null 2>&1
       [ $? -ne 0 ] && echo "WARNING: the command '$COMMAND' doesn't exist in any path, please install it and retry"
     done
 }
 
 function check_helper_cmd() {
-  which "$@" >/dev/null 2>&1
+  which $@ >/dev/null 2>&1
   [ $? -ne 0 ] && echo "WARNING: the command '$@' doesn't exist in any path, please install it and retry"
 }
 

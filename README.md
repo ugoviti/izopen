@@ -147,7 +147,9 @@ Open "Cygwin64 Terminal":
 echo 'export DISPLAY=:0' >> ~/.bashrc
 ```
 
-5. Open **XWin Server** every time you want use izopen
+5. Remember to open **XWin Server** Application every time before you want use izopen
+
+6. Download Google Chrome as default izopen browser from https://www.google.com/chrome
 
 ### MSYS2 method (DOESN'T WORKS!!!)
 Open a Windows Command prompt as Administrator and run:
