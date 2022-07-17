@@ -5,14 +5,6 @@ izOpen was designed to be used as secure URI launcher in conjunction with any Pa
 ## Features
 supported URI schemas: ssh, rdp, vnc, sftp, ftp, http, https, smb, cifs
 
-## Linux OS Installation
-```
-mkdir -p ~/.local/bin
-wget https://raw.githubusercontent.com/ugoviti/izopen/master/izopen -O ~/.local/bin/izopen
-chmod 755 ~/.local/bin/izopen
-echo 'PATH=$HOME/.local/bin:$PATH' >> ~/.bashrc
-```
-
 ### Linux OS Dependencies
 
 ### Packages
@@ -127,6 +119,28 @@ MimeType=text/html;x-scheme-handler/http;x-scheme-handler/https;' > ~/.local/sha
 Add this desktop launcher into you Desktop Bar or Menu
 
 ## Windows OS Installation (Windows 10/11) (WORK IN PROGRESS)
+
+### Windows OS Dependencies
+
+1. Install Chocolatey packager:  
+Run:
+```
+Set-ExecutionPolicy Bypass -Scope Process -Force; [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072; iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))
+```
+Go to https://chocolatey.org/install for additional info
+
+2. Install Cygwin:  
+Open Power Shell as Administrator and run:
+```
+choco install cygwin cyg-get -y
+```
+
+3. Configure Cygwin and install mandatory components:  
+Open "Cygwin64 Terminal":
+```
+```
+
+### MSYS2 method
 Open a Windows Command prompt as Administrator and run:
 ```
 pacman -Syu
@@ -145,6 +159,13 @@ Install package: `pacman -S NAME`
 
 Addintional info: https://wiki.archlinux.org/title/pacman
 
+## izOpen Installation
+```
+mkdir -p ~/.local/bin
+wget https://raw.githubusercontent.com/ugoviti/izopen/master/izopen -O ~/.local/bin/izopen
+chmod 755 ~/.local/bin/izopen
+echo 'PATH=$HOME/.local/bin:$PATH' >> ~/.bashrc
+```
 
 ## Usage (with examples):
 `izopen -h`
