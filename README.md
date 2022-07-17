@@ -122,7 +122,7 @@ Add this desktop launcher into you Desktop Bar or Menu
 
 ### Windows OS Dependencies
 
-1. Install Chocolatey packager:  
+1. Install Chocolatey Package Manager:  
 Run:
 ```
 Set-ExecutionPolicy Bypass -Scope Process -Force; [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072; iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))
@@ -135,12 +135,21 @@ Open Power Shell as Administrator and run:
 choco install cygwin cyg-get -y
 ```
 
-3. Configure Cygwin and install mandatory components:  
+3. Install Cygwin mandatory components:  
 Open "Cygwin64 Terminal":
 ```
+cyg-get.bat vim nc sshpass yad freerdp xorg-server xinit
 ```
 
-### MSYS2 method
+4. Configure Cygwin env:  
+Open "Cygwin64 Terminal":
+```
+echo 'export DISPLAY=:0' >> ~/.bashrc
+```
+
+5. Open **XWin Server** every time you want use izopen
+
+### MSYS2 method (DOESN'T WORKS!!!)
 Open a Windows Command prompt as Administrator and run:
 ```
 pacman -Syu
