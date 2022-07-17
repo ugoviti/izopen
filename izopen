@@ -43,43 +43,43 @@ function env_os_linux() {
   
   # default command for SSH
   : ${helper_name[ssh]:="ssh"}
-  : ${helper_cmd[ssh]:="${helper_name[ssh]}"}
+  : ${helper_cmd[ssh]:="ssh"}
  
   # default command for SFTP
   : ${helper_name[sftp]:="ssh"}
-  : ${helper_cmd[sftp]:="${helper_name[sftp]}"}
+  : ${helper_cmd[sftp]:="ssh"}
 
   # default command for TELNET
   : ${helper_name[telnet]:="telnet"}
-  : ${helper_cmd[telnet]:="${helper_name[telnet]}"}
+  : ${helper_cmd[telnet]:="telnet"}
 
   # default command for HTTP/S
   #: ${helper_cmd[http]:="midori"}
   : ${helper_name[http]:="google-chrome"}
-  : ${helper_cmd[http]:="${helper_name[http]}"}
+  : ${helper_cmd[http]:="google-chrome"}
 
   # default command for RDP
   #: ${helper_name[rdp]:="rdesktop"}
   #: ${helper_name[rdp]:="xfreerdp"}
   : ${helper_name[rdp]:="remmina"}
-  : ${helper_cmd[rdp]:="${helper_name[rdp]}"}
+  : ${helper_cmd[rdp]:="remmina"}
 
   # remmina specific, separe with a space every options
   : ${helper_conf[rdp]:="drive=/tmp"}
 
   # # default command for VNC
   : ${helper_name[vnc]:="vncviewer"}
-  : ${helper_vnc_cmd:="${helper_name[vnc]}"}
+  : ${helper_cmd[vnc]:="vncviewer"}
 
   # # default command for FTP
   : ${helper_name[ftp]:="xdg-open"}
-  : ${helper_cmd[ftp]:="${helper_name[ftp]}"}
+  : ${helper_cmd[ftp]:="xdg-open"}
 
   # # default command for SMB/CIFS
   : ${helper_name[smb]:="xdg-open"}
-  : ${helper_cmd[smb]:="${helper_name[smb]}"}
+  : ${helper_cmd[smb]:="xdg-open"}
   : ${helper_name[cifs]:="xdg-open"}
-  : ${helper_cmd[cifs]:="${helper_name[cifs]}"}
+  : ${helper_cmd[cifs]:="xdg-open"}
 
   # default terminal app
   # define the command to use based on current desktop environment
@@ -108,11 +108,11 @@ function env_os_windows() {
   #########################################################################
   # default command for SSH
   : ${helper_name[ssh]:="ssh"}
-  : ${helper_cmd[ssh]:="${helper_name[ssh]}"}
+  : ${helper_cmd[ssh]:="ssh"}
 
   # default command for SFTP
   : ${helper_name[sftp]:="ssh"}
-  : ${helper_cmd[sftp]:="${helper_name[sftp]}"}
+  : ${helper_cmd[sftp]:="ssh"}
 
   # default command for HTTP/S
   : ${helper_name[http]:="google-chrome"}
@@ -120,25 +120,25 @@ function env_os_windows() {
 
   # default command for RDP
   : ${helper_name[rdp]:="xfreerdp"}
-  : ${helper_cmd[rdp]:="${helper_name[rdp]}"}
+  : ${helper_cmd[rdp]:="xfreerdp"}
 
   # # default command for VNC
   : ${helper_name[vnc]:="vncviewer"}
-  : ${helper_vnc_cmd:="${helper_name[vnc]}"}
+  : ${helper_cmd[vnc]:="vncviewer"}
 
   # # default command for FTP
   : ${helper_name[ftp]:="xdg-open"}
-  : ${helper_cmd[ftp]:="${helper_name[ftp]}"}
+  : ${helper_cmd[ftp]:="xdg-open"}
 
   # # default command for SMB/CIFS
   : ${helper_name[smb]:="xdg-open"}
-  : ${helper_cmd[smb]:="${helper_name[smb]}"}
+  : ${helper_cmd[smb]:="xdg-open"}
   : ${helper_name[cifs]:="xdg-open"}
-  : ${helper_cmd[cifs]:="${helper_name[cifs]}"}
+  : ${helper_cmd[cifs]:="xdg-open"}
   
   # default terminal app
   : ${helper_name[terminal]:="mintty"}
-  : ${helper_cmd[terminal]:="${helper_name[terminal]}"}
+  : ${helper_cmd[terminal]:="mintty"}
 }
 
 # detect operating system and import the right system variables
@@ -157,6 +157,7 @@ esac
 _prog=$( echo ${0##*/} )     # define the command name
 
 : ${debug:=0}                # enable script debug
+: ${terminal_use:=1}         # open compatible schema using external terminal gui
 : ${tunnel_create:=1}        # try to create a new ssh tunnel when connecting via ssh
 : ${tunnel_use:=1}           # use the existing ssh tunnel
 : ${tunnel_use_force:=0}     # always use the tunnel for every opened uri
@@ -188,7 +189,7 @@ izopen_log_file="$izopen_conf_dir/izopen.log"
 #########################################################################
 function make_default_config() {
   cat <<EOF
-## terminal options
+# terminal options
 #helper_name[terminal]="konsole"
 #helper_cmd[terminal]="konsole"
 #helper_opts[terminal]=" --noclose"
@@ -198,22 +199,25 @@ function make_default_config() {
 #helper_cmd[ssh]="ssh"
 #helper_opts[ssh]=" -z"
 
-## rdp options (remmina)
+# rdp options (remmina)
 #helper_name[rdp]="remmina"
 #helper_cmd[rdp]="remmina"
 #helper_conf[rdp]="drive=/tmp"
 
-## rdp options (freerdp)
+# rdp options (freerdp)
 #helper_name[rdp]="xfreerdp"
 #helper_cmd[rdp]="xfreerdp"
 #helper_opts[rdp]="/drive:/tmp"
 
-## browser options
+# browser options
 #helper_name[http]="google-chrome"
 #helper_cmd[http]="google-chrome"
 #helper_opts[http]="--proxy-bypass-list='<-loopback>'"
 
 # others uri
+#helper_name[vnc]="vncviewer"
+#helper_cmd[vnc]="vncviewer"
+
 #helper_name[ftp]="xdg-open"
 #helper_cmd[ftp]="xdg-open"
 
@@ -281,15 +285,15 @@ function helper_ssh() {
   #[ -z "$password" ] && read -p "password: " password;
   
   # manage non mandatory cmd options
-  helper_cmd_opts="${helper_opts[ssh]}"  
+  helper_opts="${helper_opts[ssh]}"  
   # add username, otherwise use the current logged in user
-  [ ! -z "$username" ] && helper_cmd_opts+=" $username@$host" || helper_cmd_opts+=" $host"
+  [ ! -z "$username" ] && helper_opts+=" $username@$host" || helper_opts+=" $host"
   # add the port if not default 22
-  [ ! -z "$port" ] && helper_cmd_opts+=" -p $port"
+  [ ! -z "$port" ] && helper_opts+=" -p $port"
   # enable compression
-  helper_cmd_opts+=" -C"
+  helper_opts+=" -C"
   # if tunnel_create=1 add ssh options to create socks tunnel and compression
-  [ "$tunnel_create" = 1 ] && helper_cmd_opts+=" -D $tunnel_port_create"
+  [ "$tunnel_create" = 1 ] && helper_opts+=" -D $tunnel_port_create"
   
   # FIXME don't use sshpass outside linux environment because this bug:
   # https://github.com/msys2/MSYS2-packages/issues/2458
@@ -298,20 +302,22 @@ function helper_ssh() {
     if [ ! -z "$password" ]; then
       # pretty insecure, but the export is needed to avoid printing password into processlist
       export SSHPASS=$password
-      helper_cmd_prepend+="sshpass -e "
+      helper_prepend+="sshpass -e "
       # debug
       #echo SSHPASS: $SSHPASS
     fi
   fi
 
+  [ "$terminal_use" = 1 ] && helper_cmd="${helper_cmd[terminal]} ${helper_opts[terminal]} -e "
+  
   # set the final command
-  helper_cmd="${helper_cmd[terminal]} ${helper_opts[terminal]} -e ${helper_cmd_prepend}${helper_cmd[ssh]}${helper_cmd_opts}"
+  helper_cmd+="${helper_prepend}${helper_cmd[ssh]}${helper_opts}"
 
   #######
   ## TEST
   #######
   ## colorized prompt:
-  #helper_cmd="gnome-terminal -e \"ssh $([ -n "$port" ] && echo "-p $port") $username@$host ${helper_cmd_opts}\""
+  #helper_cmd="gnome-terminal -e \"ssh $([ -n "$port" ] && echo "-p $port") $username@$host ${helper_opts}\""
   #helper_opts[ssh]="--title=\"export PS1='\e[0;31m[\u@\h \W]\$ \e[m '; exec bash\""
 }
 
@@ -323,42 +329,42 @@ function helper_telnet() {
   #[ -z "$password" ] && read -p "password: " password;
   
   # manage non mandatory cmd options
-  helper_cmd_opts="${helper_opts[telnet]}"
-  helper_cmd_opts+=" $host"
-  [ -n "$port" ] && helper_cmd_opts+=" $port"
+  helper_opts="${helper_opts[telnet]}"
+  helper_opts+=" $host"
+  [ -n "$port" ] && helper_opts+=" $port"
 
   # set the final command
-  helper_cmd="${helper_cmd[terminal]} ${helper_opts[terminal]} -e ${helper_cmd_prepend}${helper_cmd[telnet]}${helper_cmd_opts}"
+  helper_cmd="${helper_cmd[terminal]} ${helper_opts[terminal]} -e ${helper_prepend}${helper_cmd[telnet]}${helper_opts}"
 }
 
 function helper_http() {
   check_helper_cmd "${helper_cmd[http]}"
   
   # manage non mandatory cmd options
-  helper_cmd_opts="${helper_opts[http]}"
+  helper_opts="${helper_opts[http]}"
   
   # run the connection
   case ${helper_name[http]} in
     google-chrome)
       # open the browser with this options only on tunnel connection
       if [ $tunnel_use = 1 ]; then
-        helper_cmd_opts+=" --aggressive-cache-discard"
-        helper_cmd_opts+=" --disable-notifications"
-        helper_cmd_opts+=" --enable-aggressive-domstorage-flushing"
-        helper_cmd_opts+=" --disable-client-side-phishing-detection"
-        helper_cmd_opts+=" --disable-gpu"
-        helper_cmd_opts+=" --restore-last-session"
-        helper_cmd_opts+=" --no-first-run"
-        helper_cmd_opts+=" --disable-translate"
-        helper_cmd_opts+=" --password-store=basic"
-        helper_cmd_opts+=" --proxy-server=\"socks5://localhost:$tunnel_port_use\""
-        helper_cmd_opts+=" --user-data-dir=\"$izopen_conf_dir/google-chrome/$tunnel_port_use\""
+        helper_opts+=" --aggressive-cache-discard"
+        helper_opts+=" --disable-notifications"
+        helper_opts+=" --enable-aggressive-domstorage-flushing"
+        helper_opts+=" --disable-client-side-phishing-detection"
+        helper_opts+=" --disable-gpu"
+        helper_opts+=" --restore-last-session"
+        helper_opts+=" --no-first-run"
+        helper_opts+=" --disable-translate"
+        helper_opts+=" --password-store=basic"
+        helper_opts+=" --proxy-server=\"socks5://localhost:$tunnel_port_use\""
+        helper_opts+=" --user-data-dir=\"$izopen_conf_dir/google-chrome/$tunnel_port_use\""
       fi
-      # because this helper doesn't works via proxychains wrapper, don't use the ${helper_cmd_prepend} command
-      unset helper_cmd_prepend
+      # because this helper doesn't works via proxychains wrapper, don't use the ${helper_prepend} command
+      unset helper_prepend
       ;;
     midori)
-      helper_cmd_opts+=" -c \"$izopen_conf_dir/midori/$tunnel_port_use\""
+      helper_opts+=" -c \"$izopen_conf_dir/midori/$tunnel_port_use\""
       ;;
     *)
       helper_cmd[http]="xdg-open"
@@ -366,14 +372,14 @@ function helper_http() {
   esac
   
   # launch the uri
-  helper_cmd="${helper_cmd_prepend}${helper_cmd[http]} ${helper_cmd_opts} ${uri}"
+  helper_cmd="${helper_prepend}${helper_cmd[http]} ${helper_opts} ${uri}"
 }
 
 function helper_rdp() {
   check_helper_cmd "${helper_cmd[rdp]}"
   
   # manage non mandatory cmd options
-  helper_cmd_opts="${helper_opts[rdp]}"
+  helper_opts="${helper_opts[rdp]}"
 
   # obtain general info used by all rdp commands
   ## extract windows domain from username and convert to the right name
@@ -413,38 +419,38 @@ function helper_rdp() {
   # run the connection
   case ${helper_name[rdp]} in
     rdesktop)
-      helper_cmd_opts+=" -k it -g 1280x780"
-      [ -n "$domain" ]   && helper_cmd_opts+=" -d '$domain'"
-      [ -n "$username" ] && helper_cmd_opts+=" -u '$username'"
-      [ -n "$password" ] && helper_cmd_opts+=" -p '$password'"
+      helper_opts+=" -k it -g 1280x780"
+      [ -n "$domain" ]   && helper_opts+=" -d '$domain'"
+      [ -n "$username" ] && helper_opts+=" -u '$username'"
+      [ -n "$password" ] && helper_opts+=" -p '$password'"
       [ -n "$port" ]     && port=":$port"
 
-      helper_cmd="${helper_cmd_prepend}${helper_cmd[rdp]} ${helper_cmd_opts} ${host}${port}"
+      helper_cmd="${helper_prepend}${helper_cmd[rdp]} ${helper_opts} ${host}${port}"
       ;;
     xfreerdp)
       # FIXME: this function always use the default keyboard
-      helper_cmd_opts+=" +clipboard /size:85% /cert-tofu /cert-ignore /log-level:ERROR"
+      helper_opts+=" +clipboard /size:85% /cert-tofu /cert-ignore /log-level:ERROR"
 
       #kbd_layout="$(setxkbmap -print | grep xkb_symbols | awk '{print $4}' | awk -F"+" '{print $2}' | awk -F":" '{print $1}')"
       #case "$kbd_layout" in
       #  'it(us)'|'us') kbd_layout="United States - English" ;;
       #esac
-      #[ ! -z "$kbd_layout" ] && helper_cmd_opts+=" /kbd:\"$kbd_layout\""
-      #helper_cmd_opts+=" /audio-mode:0 /microphone:sys:pulse /sound:sys:pulse"
-      [ ! -z "$domain" ]   && helper_cmd_opts+=" /d:'$domain'"
-      [ ! -z "$username" ] && helper_cmd_opts+=" /u:'$username'"
-      [ ! -z "$password" ] && helper_cmd_opts+=" /p:$password" || helper_cmd_opts+=" /p:''"
-      [ ! -z "$port" ]     && helper_cmd_opts+=" /port:$port"
-      [ ! -z "$security" ] && helper_cmd_opts+=" /sec:$security"
-      [ "$console" = "TRUE" ] && helper_cmd_opts+=" /console"
+      #[ ! -z "$kbd_layout" ] && helper_opts+=" /kbd:\"$kbd_layout\""
+      #helper_opts+=" /audio-mode:0 /microphone:sys:pulse /sound:sys:pulse"
+      [ ! -z "$domain" ]   && helper_opts+=" /d:'$domain'"
+      [ ! -z "$username" ] && helper_opts+=" /u:'$username'"
+      [ ! -z "$password" ] && helper_opts+=" /p:$password" || helper_opts+=" /p:''"
+      [ ! -z "$port" ]     && helper_opts+=" /port:$port"
+      [ ! -z "$security" ] && helper_opts+=" /sec:$security"
+      [ "$console" = "TRUE" ] && helper_opts+=" /console"
       
       # proxy tunnel manage
-      [ $tunnel_use = 1 ] && helper_cmd_opts+=" /proxy:socks5://localhost:$tunnel_port_use"
+      [ $tunnel_use = 1 ] && helper_opts+=" /proxy:socks5://localhost:$tunnel_port_use"
       
-      # because this helper doesn't works via proxychains wrapper, don't use the ${helper_cmd_prepend} command
-      unset helper_cmd_prepend
+      # because this helper doesn't works via proxychains wrapper, don't use the ${helper_prepend} command
+      unset helper_prepend
       
-      helper_cmd="${helper_cmd_prepend}${helper_cmd[rdp]} ${helper_cmd_opts} /v:${host}"
+      helper_cmd="${helper_prepend}${helper_cmd[rdp]} ${helper_opts} /v:${host}"
       ;;
     remmina)
       izopen_conf_remmina_dir="$izopen_conf_dir/remmina"
@@ -473,23 +479,23 @@ EOF
       
       make_remmina_conf > "${izopen_conf_remmina_host}"
       
-      # because this helper doesn't works via proxychains wrapper, don't use the ${helper_cmd_prepend} command
-      unset helper_cmd_prepend
+      # because this helper doesn't works via proxychains wrapper, don't use the ${helper_prepend} command
+      unset helper_prepend
       
-      helper_cmd="${helper_cmd_prepend}${helper_cmd[rdp]} ${helper_cmd_opts} -c ${izopen_conf_remmina_host}"
+      helper_cmd="${helper_prepend}${helper_cmd[rdp]} ${helper_opts} -c ${izopen_conf_remmina_host}"
       ;;
   esac
 }
 
 function helper_vnc() {
-  check_helper_cmd "${helper_vnc_cmd}"
+  check_helper_cmd "${helper_cmd[vnc]}"
   # manage non mandatory cmd options
-  helper_cmd_opts="${helper_opts[vnc]}"
+  helper_opts="${helper_opts[vnc]}"
   
   # vnc doesn't support username and actually don't accept the password. use the gnome keyring instead for this
   #helper_cmd="vinagre $schema://$host$([ -n $port ] && echo ":$port")"
-  [ -n $port ] && helper_cmd_opts+=":$port"
-  helper_cmd="${helper_vnc_cmd} ${host}${helper_cmd_opts}"
+  [ -n $port ] && helper_opts+=":$port"
+  helper_cmd="${helper_cmd[vnc]} ${host}${helper_opts}"
 }
 
 function helper_sftp() {
@@ -500,7 +506,7 @@ function helper_sftp() {
 
 function helper_ftp() {
   check_helper_cmd "${helper_cmd[ftp]}"
-  helper_cmd="${helper_cmd_prepend}${helper_cmd[ftp]} ${helper_cmd_opts} \"${uri}\""
+  helper_cmd="${helper_prepend}${helper_cmd[ftp]} ${helper_opts} \"${uri}\""
 }
 
 function helper_https() {
@@ -513,12 +519,12 @@ function helper_about() {
 
 function helper_smb() {
   check_helper_cmd "${helper_cmd[smb]}"
-  helper_cmd="${helper_cmd_prepend}${helper_cmd[smb]} ${helper_cmd_opts} \"${uri}\""
+  helper_cmd="${helper_prepend}${helper_cmd[smb]} ${helper_opts} \"${uri}\""
 }
 
 function helper_cifs() {
   check_helper_cmd "${helper_cmd[cifs]}"
-  helper_cmd="${helper_cmd_prepend}${helper_cmd[cifs]} ${helper_cmd_opts} \"${uri}\""
+  helper_cmd="${helper_prepend}${helper_cmd[cifs]} ${helper_opts} \"${uri}\""
 }
 
 # SYSTEM FUNCTIONS
@@ -622,7 +628,7 @@ function helper_tunnel_manage() {
   if [[ $tunnel_use = 1 && ! -z $tunnel_port_use && $tunnel_port_use =~ ^-?[0-9]+$ && $tunnel_port_use -ge $tunnel_port_min && $tunnel_port_use -le $tunnel_port_max ]]
   then
     # proxychains configuration
-    helper_cmd_prepend="proxychains4 -f $izopen_conf_proxychains_dir/$tunnel_port_use.conf "
+    helper_prepend="proxychains4 -f $izopen_conf_proxychains_dir/$tunnel_port_use.conf "
   #  else
   #    [ ! -z $tunnel_port_use ] && LANG=C yad --center --error --text="La porta specificata non è valida: $tunnel_port_use\n\nInserire una porta compresa fra $tunnel_port_min e $tunnel_port_max" 2>/dev/null && unset tunnel_port_use
   fi
@@ -660,7 +666,7 @@ function print_log_debug() {
                path: ${path}
       tunnel_create: ${tunnel_create} - port: ${tunnel_port_create}
          tunnel_use: ${tunnel_use} - port: ${tunnel_port_use}
- helper_cmd_prepend: ${helper_cmd_prepend}
+     helper_prepend: ${helper_prepend}
                 cmd: ${helper_cmd}
 EOF
   echo "----------------------------------------------------------------------------------------"
@@ -854,8 +860,9 @@ Options:
   -h, --help             Show help options
   -d, --debug            Enable debug (default: $debug)
   -u, --uri              Specify the URI to open (you can also specify the URL as last argument without this option)
-  -t, --tunnel           Force the usage request of an already estabilished ssh tunnel when opening the uri (default: $tunnel_use)
-  -p, --port             Use the specified socks port to connect using reverse tunnel (default: request every time)
+  -t, --terminal         Open compatible schema using external terminal gui (default: $terminal_use)
+  -f, --force-tunnel     Force the usage request of an already estabilished ssh tunnel when opening the uri (default: $tunnel_use)
+  -p, --port             Use the specified socks port to connect using reverse tunnel (default: request the port to use)
   --mkconfig             Create default config file, overwriting it if already exist (default location: $izopen_conf_file)
 
 Examples:
@@ -895,8 +902,8 @@ EOF
 [ $# = 0 ] && _usage && exit 1
 
 # define command short and long options
-_optionsShort="hu:dtp:"
-_optionsLong="help,uri:,debug,tunnel,port,mkconfig"
+_optionsShort="hu:dtfp:"
+_optionsLong="help,uri:,debug,terminal,force-tunnel,port,mkconfig"
 
 # options may be followed by one colon to indicate they have a required argument
 if ! options=$(getopt -o $_optionsShort -l $_optionsLong -- "$@"); then
@@ -921,12 +928,17 @@ while [ $# -gt 0 ]; do
     -d|--debug)
       debug="1"
       ;;
-    -t|--tunnel)
+    -t|--terminal)
+      # force usage of estabilished tunnel for all uri schema
+      [ $terminal_use = 1 ] && terminal_use=0 || terminal_use=1
+      ;;
+    -f|--force-tunnel)
       # force usage of estabilished tunnel for all uri schema
       tunnel_use_force=1
       tunnel_use_force_ssh=1
       ;;
     -p|--port)
+      # specify the tunnel port to use (ssh schema excluded). it involves --force-tunnel
       shift
       tunnel_use_force=1
       # use the specified tunnel socks port
