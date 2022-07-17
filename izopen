@@ -219,7 +219,7 @@ function check_system_commands() {
 function check_helper_cmd() {
   case $OSTYPE in
     cygwin*|msys*)
-      which "$(cygpath $@)" >/dev/null 2>&1
+      which "$(cygpath "$@")" >/dev/null 2>&1
       ;;
     *)
       which "$@" >/dev/null 2>&1
