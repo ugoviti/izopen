@@ -383,7 +383,7 @@ function helper_rdp() {
     username=$(echo $frmdata | awk 'BEGIN {FS="|" } { print $3 }')
     password=$(echo $frmdata | awk 'BEGIN {FS="|" } { print $4 }')
     # escape all special characters in password
-    password=$(echo $password | sed 's/[][`~!@#$%^&*()-_=+{}\|;:",<.>/?'"'"']/\\&/g')
+    password=$(echo $password | sed 's/[^a-zA-Z0-9]/\\&/g')
     security=$(echo $frmdata | awk 'BEGIN {FS="|" } { print $5 }')
     console=$(echo $frmdata | awk 'BEGIN {FS="|" } { print $6 }')
   fi
@@ -758,7 +758,7 @@ function uri_open() {
   local port="$uri_port"
   local path="$uri_path"
   # for safety logging create a new uri variable without the password
-  [ -z "$password" ] && local uri_safe="$uri" || local uri_safe="$(echo "$uri" | sed "s/:$(echo "$password" | sed 's/[][`~!@#$%^&*()-_=+{}\|;:",<.>/?'"'"']/\\&/g')//g")"
+  [ -z "$password" ] && local uri_safe="$uri" || local uri_safe="$(echo "$uri" | sed "s/:$(echo "$password" | sed 's/[^a-zA-Z0-9]/\\&/g')//g")"
 
   uri_unset
     
