@@ -104,7 +104,7 @@ function env_os_windows() {
 
   # default command for HTTP/S
   : ${helper_name[http]:="google-chrome"}
-  : ${helper_cmd[http]:="/c/Program\ Files/Google/Chrome/Application/chrome.exe"}
+  : ${helper_cmd[http]:="/cygdrive/c/Program\ Files/Google/Chrome/Application/chrome.exe"}
 
   # default command for RDP
   : ${helper_cmd[rdp]:="xfreerdp"}
@@ -318,7 +318,7 @@ function helper_telnet() {
   [ -n "$port" ] && helper_opts+=" $port"
   
   # launch the uri
-  helper_cmd="${helper_prepend}${helper_cmd[telnet]}${helper_opts}"
+  helper_cmd+="${helper_prepend}${helper_cmd[telnet]}${helper_opts}"
 }
 
 function helper_http() {
@@ -360,7 +360,7 @@ function helper_http() {
   esac
   
   # launch the uri
-  helper_cmd="${helper_prepend}${helper_cmd[http]}${helper_opts} ${uri}"
+  helper_cmd+="${helper_prepend}${helper_cmd[http]}${helper_opts} ${uri}"
 }
 
 function helper_rdp() {
@@ -418,7 +418,7 @@ function helper_rdp() {
       [ -n "$port" ]     && port=":$port"
 
       # launch the uri
-      helper_cmd="${helper_prepend}${helper_cmd[rdp]}${helper_opts} ${host}${port}"
+      helper_cmd+="${helper_prepend}${helper_cmd[rdp]}${helper_opts} ${host}${port}"
       ;;
     xfreerdp)
       # FIXME: this function always use the default keyboard
@@ -444,7 +444,7 @@ function helper_rdp() {
       unset helper_prepend
       
       # launch the uri
-      helper_cmd="${helper_prepend}${helper_cmd[rdp]}${helper_opts} /v:${host}"
+      helper_cmd+="${helper_prepend}${helper_cmd[rdp]}${helper_opts} /v:${host}"
       ;;
     remmina)
       izopen_conf_remmina_dir="$izopen_conf_dir/remmina"
@@ -477,7 +477,7 @@ EOF
       unset helper_prepend
       
       # launch the uri
-      helper_cmd="${helper_prepend}${helper_cmd[rdp]}${helper_opts} -c ${izopen_conf_remmina_host}"
+      helper_cmd+="${helper_prepend}${helper_cmd[rdp]}${helper_opts} -c ${izopen_conf_remmina_host}"
       ;;
   esac
 }
@@ -496,7 +496,7 @@ function helper_vnc() {
   [ -n $port ] && helper_opts+=":$port"
   
   # launch the uri
-  helper_cmd="${helper_cmd[vnc]} ${host}${helper_opts}"
+  helper_cmd+="${helper_cmd[vnc]} ${host}${helper_opts}"
 }
 
 function helper_sftp() {
@@ -506,7 +506,7 @@ function helper_sftp() {
   helper_opts=" ${helper_opts[sftp]}"
   
   # launch the uri
-  helper_cmd="helper_ssh \"$uri\""
+  helper_cmd+="helper_ssh \"$uri\""
 }
 
 function helper_ftp() {
@@ -516,7 +516,7 @@ function helper_ftp() {
   helper_opts=" ${helper_opts[ftp]}"
   
   # launch the uri
-  helper_cmd="${helper_prepend}${helper_cmd[ftp]}${helper_opts} \"${uri}\""
+  helper_cmd+="${helper_prepend}${helper_cmd[ftp]}${helper_opts} \"${uri}\""
 }
 
 function helper_https() {
@@ -533,7 +533,7 @@ function helper_smb() {
   # manage non mandatory cmd options
   helper_opts=" ${helper_opts[smb]}"
   
-  helper_cmd="${helper_prepend}${helper_cmd[smb]}${helper_opts} \"${uri}\""
+  helper_cmd+="${helper_prepend}${helper_cmd[smb]}${helper_opts} \"${uri}\""
 }
 
 function helper_cifs() {
@@ -542,7 +542,7 @@ function helper_cifs() {
   # manage non mandatory cmd options
   helper_opts=" ${helper_opts[cifs]}"
   
-  helper_cmd="${helper_prepend}${helper_cmd[cifs]}${helper_opts} \"${uri}\""
+  helper_cmd+="${helper_prepend}${helper_cmd[cifs]}${helper_opts} \"${uri}\""
 }
 
 # SYSTEM FUNCTIONS
@@ -786,7 +786,7 @@ function uri_open() {
     if [ "$izopen_os_env" = "windows" ]; then
         # windows cygwin/msys2 env use the /dev/clipboard for sharing
         local clipboard=$(cat /dev/clipboard)
-        echo -n " " > /dev/clipboard
+        #echo -n " " > /dev/clipboard
       else
         local clipboard=$(xsel -b)
         # remove the password from the clipboard
