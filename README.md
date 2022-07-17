@@ -151,9 +151,20 @@ echo 'export DISPLAY=:0' >> ~/.bashrc
 
 6. Download Google Chrome as default izopen browser from https://www.google.com/chrome
 
-7. Continue with izopen installation
+7. Create the file `izopen.reg` containing URL handler configuration (WIP: WARNIN DOESN'T WORKS RIGHT NOW)
+```
+REGEDIT4
+[HKEY_CLASSES_ROOT\ssh]
+@="URL:izOpen SSH Handler"
+"URL Protocol"=""
+[HKEY_CLASSES_ROOT\ssh\shell]
+[HKEY_CLASSES_ROOT\ssh\shell\open]
+[HKEY_CLASSES_ROOT\ssh\shell\open\command]
+@="\"c:\\tools\\cygwin\\bin\\bash -l -c \"$HOME/.local/bin/izopen \"%1\"\""
+```
 
-FIXME: is missing URI SCHEMA associations
+8. Continue with izopen installation
+
 
 ### MSYS2 method (DOESN'T WORKS!!! DON'T USE!!! IS HERE ONLY FOR REFERENCE)
 Open a Windows Command prompt as Administrator and run:
