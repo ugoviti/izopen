@@ -346,7 +346,14 @@ function helper_http() {
         helper_opts+=" --disable-translate"
         helper_opts+=" --password-store=basic"
         helper_opts+=" --proxy-server=\"socks5://localhost:$tunnel_port_use\""
-        helper_opts+=" --user-data-dir=\"$izopen_conf_dir/google-chrome/$tunnel_port_use\""
+        case $izopen_os_env in
+          cygwin*)
+            helper_opts+=" --user-data-dir=\"$(cygpath -w "$izopen_conf_dir/google-chrome/$tunnel_port_use")\""
+            ;;
+          *)
+            helper_opts+=" --user-data-dir=\"$izopen_conf_dir/google-chrome/$tunnel_port_use\""
+            ;;
+        esac
       fi
       # because this helper doesn't works via proxychains wrapper, don't use the ${helper_prepend} command
       unset helper_prepend
