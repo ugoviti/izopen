@@ -155,13 +155,17 @@ echo 'export DISPLAY=:0' >> ~/.bashrc
 ```
 REGEDIT4
 [HKEY_CLASSES_ROOT\ssh]
-@="URL:izOpen SSH Handler"
+@="izOpen SSH Handler"
 "URL Protocol"=""
 [HKEY_CLASSES_ROOT\ssh\shell]
 [HKEY_CLASSES_ROOT\ssh\shell\open]
 [HKEY_CLASSES_ROOT\ssh\shell\open\command]
-@="\"c:\\tools\\cygwin\\bin\\bash -l -c \"$HOME/.local/bin/izopen \"%1\"\""
+@="\"c:\\tools\\cygwin\\bin\\bash -l -i -c izopen \"%1\""
 ```
+
+C:\tools\cygwin\bin\bash -l -i -c "izopen ssh://root@10.1.1.8 -d"
+
+c:\tools\cygwin\bin\bash.exe --login -i -c 'izopen -d ssh://root@10.1.1.8'
 
 8. Continue with izopen installation
 
