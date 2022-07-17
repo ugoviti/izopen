@@ -269,7 +269,7 @@ function helper_ssh() {
   
   # FIXME don't use sshpass outside linux environment because this bug:
   # https://github.com/msys2/MSYS2-packages/issues/2458
-  if [ "$izopen_os_env" = "linux" ]; then
+  #if [ "$izopen_os_env" = "linux" ]; then
     # password less login using sshpass
     if [ ! -z "$password" ]; then
       # pretty insecure, but the export is needed to avoid printing password into processlist
@@ -278,9 +278,9 @@ function helper_ssh() {
       # debug
       #echo SSHPASS: $SSHPASS
     fi
-  fi
+  #fi
 
-  [ "$terminal_use" = 1 ] && helper_cmd="${helper_cmd[terminal]} ${helper_opts[terminal]} -e "
+  [ "$terminal_use" = 1 ] && helper_cmd="${helper_cmd[terminal]}${helper_opts[terminal]} -e "
   
   # set the final command
   helper_cmd+="${helper_prepend}${helper_cmd[ssh]}${helper_opts}"
