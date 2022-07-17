@@ -27,8 +27,6 @@ VERSION_DATE="20220715"
 ## KeePassX 2.x integration (Fedora >= 23):
 ##        dnf install -y yad kdelibs3 proxychains-ng keepassx
 
-schema_supported="ssh|telnet|rdp|vnc|sftp|ftp|http|https|about|smb|cifs|file"
-
 # declare the following variables as global array
 declare -A helper_name helper_cmd helper_opts helper_conf
 
@@ -86,7 +84,8 @@ function env_os_linux() {
   elif [ "$XDG_CURRENT_DESKTOP" = "Pantheon" ]; then
       : ${helper_name[terminal]:="exo-open --launch TerminalEmulator"}
     else
-      : ${helper_name[terminal]:="xterm"}
+      #: ${helper_name[terminal]:="xterm"}
+      : ${helper_name[terminal]:="konsole"}
   fi
   : ${helper_cmd[terminal]:="${helper_name[terminal]}"}
 }
@@ -137,7 +136,7 @@ esac
 
 ## variables
 #########################################################################
-_prog=$( echo ${0##*/} )     # define the command name
+_PROG=$( echo ${0##*/} )     # define the command name
 
 : ${debug:=0}                # enable script debug
 : ${terminal_use:=1}         # open compatible schema using external terminal gui
@@ -739,6 +738,7 @@ function uri_open() {
   # try to obtain password from clipboard
   if [[ -z "$password" ]]; then
     if [ "$izopen_os_env" = "windows" ]; then
+        # windows cygwin/msys2 env use the /dev/clipboard for sharing
         local clipboard=$(cat /dev/clipboard)
         echo -n " " > /dev/clipboard
       else
@@ -758,7 +758,7 @@ function uri_open() {
   local port="$uri_port"
   local path="$uri_path"
   # for safety logging create a new uri variable without the password
-  [ -z "$password" ] && local uri_safe="$uri" || local uri_safe="$(echo "$uri" | sed "s/:$(echo $password | sed 's/[][`~!@#$%^&*()-_=+{}\|;:",<.>/?'"'"']/\\&/g')//g")"
+  [ -z "$password" ] && local uri_safe="$uri" || local uri_safe="$(echo "$uri" | sed "s/:$(echo "$password" | sed 's/[][`~!@#$%^&*()-_=+{}\|;:",<.>/?'"'"']/\\&/g')//g")"
 
   uri_unset
     
@@ -777,6 +777,7 @@ function uri_open() {
       # create or use ssh tunnel if required
       case $schema in
         ssh)
+          # here only to mantain tunnel_create=1 if defined
           ;;
         *)
           # only ssh schema can be used to create a tunnel
@@ -825,13 +826,13 @@ function uri_open() {
 
 # usage help menu
 function _usage()  {
-  _prog=$( echo ${0##*/} )
+  _PROG=$( echo ${0##*/} )
   cat <<EOF
 $NAME - $DESCRIPTION
 written by Ugo Viti <ugo.viti@initzero.it>
 version: $VERSION - release: $VERSION_DATE
 
-Usage: $_prog [options] URI
+Usage: $_PROG [options] URI
 
 Options:
   -h, --help             Show help options
@@ -844,34 +845,34 @@ Options:
 
 Examples:
   # general usage:
-  $ $_prog uri://username:password@address:port
+  $ $_PROG uri://username:password@address:port
   
   # open a http web page:
-  $ $_prog http://www.example.com
+  $ $_PROG http://www.example.com
   
   # open a http web page specifing username and password:
-  $ $_prog http://john:doe@www.example.com
+  $ $_PROG http://john:doe@www.example.com
   
   # open a ssh connection specifing username and port:
-  $ $_prog ssh://root@secure.example.com:222
+  $ $_PROG ssh://root@secure.example.com:222
   
   # open a rdp connection specifing username and password:
-  $ $_prog rdp:///Administrator:password@server
+  $ $_PROG rdp:///Administrator:password@server
   
   # open a rdp connection specifing domain/username and password and port:
-  $ $_prog rdp://DOMAIN/Administrator:password@server:33189
+  $ $_PROG rdp://DOMAIN/Administrator:password@server:33189
   
   # open a rdp connection specifing username@domain and password and port:
-  $ $_prog rdp://Administrator@example.com:password@server:33189
+  $ $_PROG rdp://Administrator@example.com:password@server:33189
   
   # open a smb file share with default file manager:
-  $ $_prog smb://Administrator:password@server
+  $ $_PROG smb://Administrator:password@server
   
   # open a http browser using an already connected ssh tunnel (ask for the port):
-  $ $_prog -t
+  $ $_PROG -t
   
   # open a http browser using an already connected ssh tunnel specifing the port (-t option is implicit for -p):
-  $ $_prog -p 2069
+  $ $_PROG -p 2069
 EOF
 }
 
