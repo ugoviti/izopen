@@ -42,43 +42,34 @@ function env_os_linux() {
   #########################################################################
   
   # default command for SSH
-  : ${helper_name[ssh]:="ssh"}
   : ${helper_cmd[ssh]:="ssh"}
  
   # default command for SFTP
-  : ${helper_name[sftp]:="ssh"}
   : ${helper_cmd[sftp]:="ssh"}
 
   # default command for TELNET
-  : ${helper_name[telnet]:="telnet"}
   : ${helper_cmd[telnet]:="telnet"}
 
   # default command for HTTP/S
   #: ${helper_cmd[http]:="midori"}
-  : ${helper_name[http]:="google-chrome"}
   : ${helper_cmd[http]:="google-chrome"}
 
   # default command for RDP
-  #: ${helper_name[rdp]:="rdesktop"}
-  #: ${helper_name[rdp]:="xfreerdp"}
-  : ${helper_name[rdp]:="remmina"}
+  #: ${helper_cmd[rdp]:="rdesktop"}
+  #: ${helper_cmd[rdp]:="xfreerdp"}
   : ${helper_cmd[rdp]:="remmina"}
 
   # remmina specific, separe with a space every options
   : ${helper_conf[rdp]:="drive=/tmp"}
 
   # # default command for VNC
-  : ${helper_name[vnc]:="vncviewer"}
   : ${helper_cmd[vnc]:="vncviewer"}
 
   # # default command for FTP
-  : ${helper_name[ftp]:="xdg-open"}
   : ${helper_cmd[ftp]:="xdg-open"}
 
   # # default command for SMB/CIFS
-  : ${helper_name[smb]:="xdg-open"}
   : ${helper_cmd[smb]:="xdg-open"}
-  : ${helper_name[cifs]:="xdg-open"}
   : ${helper_cmd[cifs]:="xdg-open"}
 
   # default terminal app
@@ -107,11 +98,9 @@ function env_os_windows() {
   ## helper commands
   #########################################################################
   # default command for SSH
-  : ${helper_name[ssh]:="ssh"}
   : ${helper_cmd[ssh]:="ssh"}
 
   # default command for SFTP
-  : ${helper_name[sftp]:="ssh"}
   : ${helper_cmd[sftp]:="ssh"}
 
   # default command for HTTP/S
@@ -119,25 +108,19 @@ function env_os_windows() {
   : ${helper_cmd[http]:="/c/Program\ Files/Google/Chrome/Application/chrome.exe"}
 
   # default command for RDP
-  : ${helper_name[rdp]:="xfreerdp"}
   : ${helper_cmd[rdp]:="xfreerdp"}
 
   # # default command for VNC
-  : ${helper_name[vnc]:="vncviewer"}
   : ${helper_cmd[vnc]:="vncviewer"}
 
   # # default command for FTP
-  : ${helper_name[ftp]:="xdg-open"}
   : ${helper_cmd[ftp]:="xdg-open"}
 
   # # default command for SMB/CIFS
-  : ${helper_name[smb]:="xdg-open"}
   : ${helper_cmd[smb]:="xdg-open"}
-  : ${helper_name[cifs]:="xdg-open"}
   : ${helper_cmd[cifs]:="xdg-open"}
   
   # default terminal app
-  : ${helper_name[terminal]:="mintty"}
   : ${helper_cmd[terminal]:="mintty"}
 }
 
@@ -190,44 +173,34 @@ izopen_log_file="$izopen_conf_dir/izopen.log"
 function make_default_config() {
   cat <<EOF
 # terminal options
-#helper_name[terminal]="konsole"
 #helper_cmd[terminal]="konsole"
 #helper_opts[terminal]=" --noclose"
 
 # ssh options
-#helper_name[ssh]="ssh"
 #helper_cmd[ssh]="ssh"
 #helper_opts[ssh]=" -z"
 
 # rdp options (remmina)
-#helper_name[rdp]="remmina"
 #helper_cmd[rdp]="remmina"
 #helper_conf[rdp]="drive=/tmp"
 
 # rdp options (freerdp)
-#helper_name[rdp]="xfreerdp"
 #helper_cmd[rdp]="xfreerdp"
 #helper_opts[rdp]="/drive:/tmp"
 
 # browser options
-#helper_name[http]="google-chrome"
 #helper_cmd[http]="google-chrome"
 #helper_opts[http]="--proxy-bypass-list='<-loopback>'"
 
+## for windows browser support define helper_name[http] too
+#helper_name[http]="google-chrome"
+#helper_cmd[http]:="/c/Program\ Files/Google/Chrome/Application/chrome.exe"}
+
 # others uri
-#helper_name[vnc]="vncviewer"
 #helper_cmd[vnc]="vncviewer"
-
-#helper_name[ftp]="xdg-open"
 #helper_cmd[ftp]="xdg-open"
-
-#helper_name[telnet]="telnet"
 #helper_cmd[telnet]="telnet"
-
-#helper_name[smb]="xdg-open"
 #helper_cmd[smb]="xdg-open"
-
-#helper_name[cifs]="xdg-open"
 #helper_cmd[cifs]="xdg-open"
 
 ## misc options
@@ -656,7 +629,7 @@ function print_log_footer() {
 function print_log_debug() {
   # print the parsed fields
   echo "-- debug -------------------------------------------------------------------------------"
-  cat <<EOF
+  cat <<EOF  
                 uri: ${uri}
              schema: ${schema}
            username: ${username}
@@ -666,103 +639,13 @@ function print_log_debug() {
                path: ${path}
       tunnel_create: ${tunnel_create} - port: ${tunnel_port_create}
          tunnel_use: ${tunnel_use} - port: ${tunnel_port_use}
+        helper_name: ${helper_name[$schema]}
+         helper_cmd: ${helper_cmd[$schema]}
+        helper_opts: ${helper_opts[$schema]}
      helper_prepend: ${helper_prepend}
                 cmd: ${helper_cmd}
 EOF
   echo "----------------------------------------------------------------------------------------"
-}
-
-function uri_open() {
-  local uri="$1"
-  shift
-  local args="$@"
-
-  # parse the uri
-  uri_parser "$uri"
-  local schema="$uri_schema"
-  local username="$uri_username"
-  local password="$uri_password"
-  # try to obtain password from clipboard
-  if [[ -z "$password" ]]; then
-    if [ "$izopen_os_env" = "windows" ]; then
-        local clipboard=$(cat /dev/clipboard)
-        echo -n " " > /dev/clipboard
-      else
-        local clipboard=$(xsel -b)
-        # remove the password from the clipboard
-        # FIXME using a workaround because xsel doesn't clean the clipboard contents I use a SPACE here. of course you can't use single space passwords here :)
-        echo -n " " | xsel -i -b
-    fi
-
-    # debug
-    #echo clipboard: $clipboard
-    #echo xsel: $(xsel -b)
-    
-    [[ ! -z "$clipboard" || "$clipboard" != " " ]] && local password="$(echo $clipboard | tr -d [:cntrl:])" || unset password
-  fi
-  local host="$uri_host"
-  local port="$uri_port"
-  local path="$uri_path"
-  # for safety logging create a new uri variable without the password
-  [ -z "$password" ] && local uri_safe="$uri" || local uri_safe="$(echo "$uri" | sed "s/:$(echo $password | sed 's/[][`~!@#$%^&*()-_=+{}\|;:",<.>/?'"'"']/\\&/g')//g")"
-
-  uri_unset
-    
-  # force the usage of ssh tunnel for every openened url
-  [ $tunnel_use_force = 1 ] && tunnel_use=1
-  
-  # Use an already estabilished ssh tunnel and open default http handler defining schema as http
-  [[ $tunnel_use -eq 1 && -z "$uri" ]] && schema=http
-  
-  # workarounds
-  [ "$schema" = "sftp" ] && schema="ssh" # alway use ssh handler with sftp uri
-  
-  ## customize the following uri for command associations:
-  case $schema in
-    ssh|telnet|rdp|vnc|sftp|ftp|http|https|about|smb|cifs|file)
-      # create or use ssh tunnel if required
-      case $schema in
-        ssh)
-          ;;
-        *)
-          # only ssh schema can be used to create a tunnel
-          tunnel_create=0
-          ;;
-      esac
-      # manage the use or creation of ssh tunnel
-      [[ "$tunnel_create" = 1 || "$tunnel_use" = 1 ]] && helper_tunnel_manage "$uri"
-      
-      TRY=1; TRYMAX=2
-      until [ $TRY -ge $TRYMAX ]; do
-        # obtain commands to use to connect
-        helper_${schema} "$uri"
-              
-        # log the command execution
-        print_log_header
-
-        # make the connection to the remote server
-        eval "${helper_cmd}"
-        RETVAL=$?
-        
-        # debug
-        #echo TRY:[$TRY/$TRYMAX] RETVAL:[$RETVAL]
-        
-        # for safety reasons unset the password after first try
-        unset password
-        
-        # exit or retry
-        [ $RETVAL = 0 ] && TRY=$TRYMAX || let TRY+=1
-      done
-      
-      # log the command output
-      [ $RETVAL != 0 ] && print_log_output
-      #print_log_footer
-      ;;
-    *)
-      echo "ERROR: invalid URI specified: $uri"
-      return 1;
-      ;;
-  esac
 }
 
 #
@@ -840,6 +723,100 @@ function confirm () {
             false
             ;;
     esac
+}
+
+
+function uri_open() {
+  local uri="$1"
+  shift
+  local args="$@"
+
+  # parse the uri
+  uri_parser "$uri"
+  local schema="$uri_schema"
+  local username="$uri_username"
+  local password="$uri_password"
+  # try to obtain password from clipboard
+  if [[ -z "$password" ]]; then
+    if [ "$izopen_os_env" = "windows" ]; then
+        local clipboard=$(cat /dev/clipboard)
+        echo -n " " > /dev/clipboard
+      else
+        local clipboard=$(xsel -b)
+        # remove the password from the clipboard
+        # FIXME using a workaround because xsel doesn't clean the clipboard contents I use a SPACE here. of course you can't use single space passwords here :)
+        echo -n " " | xsel -i -b
+    fi
+
+    # debug
+    #echo clipboard: $clipboard
+    #echo xsel: $(xsel -b)
+    
+    [[ ! -z "$clipboard" || "$clipboard" != " " ]] && local password="$(echo $clipboard | tr -d [:cntrl:])" || unset password
+  fi
+  local host="$uri_host"
+  local port="$uri_port"
+  local path="$uri_path"
+  # for safety logging create a new uri variable without the password
+  [ -z "$password" ] && local uri_safe="$uri" || local uri_safe="$(echo "$uri" | sed "s/:$(echo $password | sed 's/[][`~!@#$%^&*()-_=+{}\|;:",<.>/?'"'"']/\\&/g')//g")"
+
+  uri_unset
+    
+  # force the usage of ssh tunnel for every openened url
+  [ $tunnel_use_force = 1 ] && tunnel_use=1
+  
+  # WORKAROUND: Use an already estabilished ssh tunnel and open default http handler defining schema as http
+  [[ $tunnel_use -eq 1 && -z "$uri" ]] && schema=http
+  
+  ## customize the following uri for command associations:
+  case $schema in
+    ssh|telnet|rdp|vnc|sftp|ftp|http|https|about|smb|cifs|file)
+      # if helper_name[$schema] is not defined, use the helper_cmd[$schema] instead
+      [ -z "${helper_name[$schema]}" ] && helper_name[$schema]="${helper_cmd[$schema]}"
+    
+      # create or use ssh tunnel if required
+      case $schema in
+        ssh)
+          ;;
+        *)
+          # only ssh schema can be used to create a tunnel
+          tunnel_create=0
+          ;;
+      esac
+      # manage the use or creation of ssh tunnel
+      [[ "$tunnel_create" = 1 || "$tunnel_use" = 1 ]] && helper_tunnel_manage "$uri"
+      
+      TRY=1; TRYMAX=2
+      until [ $TRY -ge $TRYMAX ]; do
+        # obtain commands to use to connect
+        helper_${schema} "$uri"
+              
+        # log the command execution
+        print_log_header
+
+        # make the connection to the remote server
+        eval "${helper_cmd}"
+        RETVAL=$?
+        
+        # debug
+        #echo TRY:[$TRY/$TRYMAX] RETVAL:[$RETVAL]
+        
+        # for safety reasons unset the password after first try
+        unset password
+        
+        # exit or retry
+        [ $RETVAL = 0 ] && TRY=$TRYMAX || let TRY+=1
+      done
+      
+      # log the command output
+      [ $RETVAL != 0 ] && print_log_output
+      #print_log_footer
+      ;;
+    *)
+      echo "ERROR: invalid URI specified: $uri"
+      return 1;
+      ;;
+  esac
 }
 
 ###################################################################
