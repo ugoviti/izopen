@@ -102,7 +102,7 @@ function env_os_windows() {
 
   # default command for HTTP/S
   : ${helper_name[http]:="google-chrome"}
-  : ${helper_cmd[http]:="/cygdrive/c/Program\ Files/Google/Chrome/Application/chrome.exe"}
+  : ${helper_cmd[http]:="/cygdrive/c/Program Files/Google/Chrome/Application/chrome.exe"}
 
   # default command for RDP
   : ${helper_cmd[rdp]:="xfreerdp"}
@@ -217,15 +217,7 @@ function check_system_commands() {
 }
 
 function check_helper_cmd() {
-  case $OSTYPE in
-    cygwin*|msys*)
-      which "$(cygpath "$@")" >/dev/null 2>&1
-      ;;
-    *)
-      which "$@" >/dev/null 2>&1
-      ;;
-  esac
-
+  which "$@" >/dev/null 2>&1
   [ $? -ne 0 ] && echo "WARNING: the command '$@' doesn't exist in any path, please install it and retry"
 }
 
@@ -377,7 +369,7 @@ function helper_http() {
   esac
   
   # launch the uri
-  helper_cmd+="${helper_prepend}${helper_cmd[http]}${helper_opts} ${uri}"
+  helper_cmd+="${helper_prepend}\"${helper_cmd[http]}\"${helper_opts} ${uri}"
 }
 
 function helper_rdp() {
