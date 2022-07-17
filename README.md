@@ -120,7 +120,7 @@ Add this desktop launcher into you Desktop Bar or Menu
 
 ## Windows OS Installation (Windows 10/11) (WORK IN PROGRESS)
 
-### Windows OS Dependencies
+### Windows OS Dependencies (using cygwin system)
 
 1. Install Chocolatey Package Manager:  
 Run:
@@ -151,7 +151,11 @@ echo 'export DISPLAY=:0' >> ~/.bashrc
 
 6. Download Google Chrome as default izopen browser from https://www.google.com/chrome
 
-### MSYS2 method (DOESN'T WORKS!!!)
+7. Continue with izopen installation
+
+FIXME: is missing URI SCHEMA associations
+
+### MSYS2 method (DOESN'T WORKS!!! DON'T USE!!! IS HERE ONLY FOR REFERENCE)
 Open a Windows Command prompt as Administrator and run:
 ```
 pacman -Syu
@@ -160,7 +164,7 @@ pacman -S openssh sshpass openbsd-netcat vim mingw-w64-x86_64-putty mingw-w64-x8
 
 Reboot the system (of course, as always on windows, you are so used to it :) )
 
-### Manage packages
+#### Manage packages
 Update packages info: `pacman -Fy`
 Search for available package: `pacman -Ss NAME`
 Search for installed package: `pacman -Qs NAME`

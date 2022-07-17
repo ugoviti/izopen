@@ -2,7 +2,7 @@
 NAME="izopen"
 DESCRIPTION="multi protocol bash script to auto opening given URI and auto creating ssh reverse tunnel socks proxy"
 VERSION="3.0.0"
-VERSION_DATE="20220715"
+VERSION_DATE="20220718"
 
 ## izOpen is very useful when used with KeePassX or any Desktop/Browser Password Manager as secure URI launcher
 ## written by Ugo Viti <ugo.viti@initzero.it>
@@ -431,7 +431,7 @@ function helper_rdp() {
       ;;
     xfreerdp)
       # FIXME: this function always use the default keyboard
-      helper_opts+=" +clipboard /size:85% /cert-tofu /cert-ignore /log-level:ERROR"
+      helper_opts+=" +clipboard /dynamic-resolution /size:85% /cert-tofu /cert-ignore /log-level:ERROR"
 
       #kbd_layout="$(setxkbmap -print | grep xkb_symbols | awk '{print $4}' | awk -F"+" '{print $2}' | awk -F":" '{print $1}')"
       #case "$kbd_layout" in
@@ -439,8 +439,8 @@ function helper_rdp() {
       #esac
       #[ ! -z "$kbd_layout" ] && helper_opts+=" /kbd:\"$kbd_layout\""
       #helper_opts+=" /audio-mode:0 /microphone:sys:pulse /sound:sys:pulse"
-      [ ! -z "$domain" ]   && helper_opts+=" /d:'$domain'"
-      [ ! -z "$username" ] && helper_opts+=" /u:'$username'"
+      [ ! -z "$domain" ]   && helper_opts+=" /d:$domain"
+      [ ! -z "$username" ] && helper_opts+=" /u:$username"
       [ ! -z "$password" ] && helper_opts+=" /p:$password" || helper_opts+=" /p:''"
       [ ! -z "$port" ]     && helper_opts+=" /port:$port"
       [ ! -z "$security" ] && helper_opts+=" /sec:$security"
