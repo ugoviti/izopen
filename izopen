@@ -173,11 +173,11 @@ function make_default_config() {
   cat <<EOF
 # terminal options
 #helper_cmd[terminal]="konsole"
-#helper_opts[terminal]=" --noclose"
+#helper_opts[terminal]="--noclose"
 
 # ssh options
 #helper_cmd[ssh]="ssh"
-#helper_opts[ssh]=" -z"
+#helper_opts[ssh]="-z"
 
 # rdp options (remmina)
 #helper_cmd[rdp]="remmina"
@@ -224,40 +224,51 @@ function check_helper_cmd() {
 }
 
 function helper_terminal() {
+  # if helper_name[$schema] is not defined, use the helper_cmd[$schema] instead
+  [ -z "${helper_name[terminal]}" ] && helper_name[terminal]="${helper_cmd[terminal]}"
+
+  # verify if the command exist
   check_helper_cmd "${helper_cmd[terminal]}"
 
   if [ "$tunnel_create" = 1 ]; then
-     title="H:$host P:$tunnel_port_create [MASTER]"
+     local terminal_title="H:$host P:$tunnel_port_create [MASTER]"
    else
-     title="H:$host P:$tunnel_port_create [SLAVE]"
+     local terminal_title="H:$host P:$tunnel_port_create [SLAVE]"
   fi
 
   case ${helper_name[terminal]} in
     konsole)
       #helper_opts[terminal]="-p tabtitle='(%u) %H'"
-      helper_opts[terminal]+=" -p tabtitle='$title'"
-      helper_opts[terminal]+=" -p RemoteTabTitleFormat='$title'"
+      helper_opts[terminal]+=" -p tabtitle='$terminal_title'"
+      helper_opts[terminal]+=" -p RemoteTabTitleFormat='$terminal_title'"
       #helper_opts[terminal]+=" --noclose"
       ;;
     mintty)
-      helper_opts[terminal]="-T \"$title\""
+      helper_opts[terminal]+=" -T \"$terminal_title\""
       ;;
     *)
       #echo helper_name[terminal]: ${helper_name[terminal]}
-      helper_opts[terminal]=" --title=\"$title\""
+      helper_opts[terminal]+=" --title=\"$terminal_title\""
       ;;
   esac
 }
 
 function helper_ssh() {
+  # if helper_name[$schema] is not defined, use the helper_cmd[$schema] instead
+  [ -z "${helper_name[ssh]}" ] && helper_name[ssh]="${helper_cmd[ssh]}"
+  
+  # verify if the command exist
   check_helper_cmd "${helper_cmd[ssh]}"
-  helper_terminal
+  
+  # open external terminal app if required
+  [ "$terminal_use" = 1 ] && helper_terminal && helper_cmd="${helper_cmd[terminal]}${helper_opts[terminal]} -e "
 
+  # read username and password from stdin if empty
   #[ -z "$username" ] && read -p "username: " username;
   #[ -z "$password" ] && read -p "password: " password;
   
   # manage non mandatory cmd options
-  helper_opts="${helper_opts[ssh]}"  
+  helper_opts=" ${helper_opts[ssh]}"  
   # add username, otherwise use the current logged in user
   [ ! -z "$username" ] && helper_opts+=" $username@$host" || helper_opts+=" $host"
   # add the port if not default 22
@@ -269,7 +280,7 @@ function helper_ssh() {
   
   # FIXME don't use sshpass outside linux environment because this bug:
   # https://github.com/msys2/MSYS2-packages/issues/2458
-  if [ "$izopen_os_env" = "linux" ]; then
+  #if [ "$izopen_os_env" = "linux" ]; then
     # password less login using sshpass
     if [ ! -z "$password" ]; then
       # pretty insecure, but the export is needed to avoid printing password into processlist
@@ -278,11 +289,9 @@ function helper_ssh() {
       # debug
       #echo SSHPASS: $SSHPASS
     fi
-  fi
-
-  [ "$terminal_use" = 1 ] && helper_cmd="${helper_cmd[terminal]}${helper_opts[terminal]} -e "
+  #fi
   
-  # set the final command
+  # launch the uri
   helper_cmd+="${helper_prepend}${helper_cmd[ssh]}${helper_opts}"
 
   #######
@@ -294,26 +303,33 @@ function helper_ssh() {
 }
 
 function helper_telnet() {
+  # if helper_name[$schema] is not defined, use the helper_cmd[$schema] instead
+  [ -z "${helper_name[telnet]}" ] && helper_name[telnet]="${helper_cmd[telnet]}"
+
+  # verify if the command exist
   check_helper_cmd "${helper_cmd[telnet]}"
-  helper_terminal
   
-  #[ -z "$username" ] && read -p "username: " username;
-  #[ -z "$password" ] && read -p "password: " password;
+  # open external terminal app if required
+  [ "$terminal_use" = 1 ] && helper_terminal && helper_cmd="${helper_cmd[terminal]}${helper_opts[terminal]} -e "
   
   # manage non mandatory cmd options
-  helper_opts="${helper_opts[telnet]}"
+  helper_opts=" ${helper_opts[telnet]}"
   helper_opts+=" $host"
   [ -n "$port" ] && helper_opts+=" $port"
-
-  # set the final command
-  helper_cmd="${helper_cmd[terminal]} ${helper_opts[terminal]} -e ${helper_prepend}${helper_cmd[telnet]}${helper_opts}"
+  
+  # launch the uri
+  helper_cmd="${helper_prepend}${helper_cmd[telnet]}${helper_opts}"
 }
 
 function helper_http() {
+  # if helper_name[$schema] is not defined, use the helper_cmd[$schema] instead
+  [ -z "${helper_name[http]}" ] && helper_name[http]="${helper_cmd[http]}"
+  
+  # verify if the command exist
   check_helper_cmd "${helper_cmd[http]}"
   
   # manage non mandatory cmd options
-  helper_opts="${helper_opts[http]}"
+  helper_opts=" ${helper_opts[http]}"
   
   # run the connection
   case ${helper_name[http]} in
@@ -344,14 +360,18 @@ function helper_http() {
   esac
   
   # launch the uri
-  helper_cmd="${helper_prepend}${helper_cmd[http]} ${helper_opts} ${uri}"
+  helper_cmd="${helper_prepend}${helper_cmd[http]}${helper_opts} ${uri}"
 }
 
 function helper_rdp() {
+  # if helper_name[$schema] is not defined, use the helper_cmd[$schema] instead
+  [ -z "${helper_name[rdp]}" ] && helper_name[rdp]="${helper_cmd[rdp]}"
+  
+  # verify if the command exist
   check_helper_cmd "${helper_cmd[rdp]}"
   
   # manage non mandatory cmd options
-  helper_opts="${helper_opts[rdp]}"
+  helper_opts=" ${helper_opts[rdp]}"
 
   # obtain general info used by all rdp commands
   ## extract windows domain from username and convert to the right name
@@ -397,7 +417,8 @@ function helper_rdp() {
       [ -n "$password" ] && helper_opts+=" -p '$password'"
       [ -n "$port" ]     && port=":$port"
 
-      helper_cmd="${helper_prepend}${helper_cmd[rdp]} ${helper_opts} ${host}${port}"
+      # launch the uri
+      helper_cmd="${helper_prepend}${helper_cmd[rdp]}${helper_opts} ${host}${port}"
       ;;
     xfreerdp)
       # FIXME: this function always use the default keyboard
@@ -422,7 +443,8 @@ function helper_rdp() {
       # because this helper doesn't works via proxychains wrapper, don't use the ${helper_prepend} command
       unset helper_prepend
       
-      helper_cmd="${helper_prepend}${helper_cmd[rdp]} ${helper_opts} /v:${host}"
+      # launch the uri
+      helper_cmd="${helper_prepend}${helper_cmd[rdp]}${helper_opts} /v:${host}"
       ;;
     remmina)
       izopen_conf_remmina_dir="$izopen_conf_dir/remmina"
@@ -454,31 +476,47 @@ EOF
       # because this helper doesn't works via proxychains wrapper, don't use the ${helper_prepend} command
       unset helper_prepend
       
-      helper_cmd="${helper_prepend}${helper_cmd[rdp]} ${helper_opts} -c ${izopen_conf_remmina_host}"
+      # launch the uri
+      helper_cmd="${helper_prepend}${helper_cmd[rdp]}${helper_opts} -c ${izopen_conf_remmina_host}"
       ;;
   esac
 }
 
 function helper_vnc() {
-  check_helper_cmd "${helper_cmd[vnc]}"
-  # manage non mandatory cmd options
-  helper_opts="${helper_opts[vnc]}"
+  # if helper_name[$schema] is not defined, use the helper_cmd[$schema] instead
+  [ -z "${helper_name[vnc]}" ] && helper_name[vnc]="${helper_cmd[vnc]}"
   
+  # verify if the command exist
+  check_helper_cmd "${helper_cmd[vnc]}"
+  
+  # manage non mandatory cmd options
+  helper_opts=" ${helper_opts[vnc]}"
   # vnc doesn't support username and actually don't accept the password. use the gnome keyring instead for this
   #helper_cmd="vinagre $schema://$host$([ -n $port ] && echo ":$port")"
   [ -n $port ] && helper_opts+=":$port"
+  
+  # launch the uri
   helper_cmd="${helper_cmd[vnc]} ${host}${helper_opts}"
 }
 
 function helper_sftp() {
   check_helper_cmd "${helper_cmd[sftp]}"
-  #helper_cmd="xdg-open \"$uri\""
+  
+  # manage non mandatory cmd options
+  helper_opts=" ${helper_opts[sftp]}"
+  
+  # launch the uri
   helper_cmd="helper_ssh \"$uri\""
 }
 
 function helper_ftp() {
   check_helper_cmd "${helper_cmd[ftp]}"
-  helper_cmd="${helper_prepend}${helper_cmd[ftp]} ${helper_opts} \"${uri}\""
+  
+  # manage non mandatory cmd options
+  helper_opts=" ${helper_opts[ftp]}"
+  
+  # launch the uri
+  helper_cmd="${helper_prepend}${helper_cmd[ftp]}${helper_opts} \"${uri}\""
 }
 
 function helper_https() {
@@ -491,12 +529,20 @@ function helper_about() {
 
 function helper_smb() {
   check_helper_cmd "${helper_cmd[smb]}"
-  helper_cmd="${helper_prepend}${helper_cmd[smb]} ${helper_opts} \"${uri}\""
+  
+  # manage non mandatory cmd options
+  helper_opts=" ${helper_opts[smb]}"
+  
+  helper_cmd="${helper_prepend}${helper_cmd[smb]}${helper_opts} \"${uri}\""
 }
 
 function helper_cifs() {
   check_helper_cmd "${helper_cmd[cifs]}"
-  helper_cmd="${helper_prepend}${helper_cmd[cifs]} ${helper_opts} \"${uri}\""
+  
+  # manage non mandatory cmd options
+  helper_opts=" ${helper_opts[cifs]}"
+  
+  helper_cmd="${helper_prepend}${helper_cmd[cifs]}${helper_opts} \"${uri}\""
 }
 
 # SYSTEM FUNCTIONS
@@ -771,9 +817,6 @@ function uri_open() {
   ## customize the following uri for command associations:
   case $schema in
     ssh|telnet|rdp|vnc|sftp|ftp|http|https|about|smb|cifs|file)
-      # if helper_name[$schema] is not defined, use the helper_cmd[$schema] instead
-      [ -z "${helper_name[$schema]}" ] && helper_name[$schema]="${helper_cmd[$schema]}"
-    
       # create or use ssh tunnel if required
       case $schema in
         ssh)
