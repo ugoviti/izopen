@@ -33,7 +33,6 @@ declare -A helper_name helper_cmd helper_opts helper_conf
 ## mandatory system commands based on operating system
 #########################################################################
 function env_os_linux() {
-  izopen_os_env="linux"
   system_commands="yad nc xdg-open ssh sshpass telnet xsel proxychains"
 
   ## helper commands
@@ -91,7 +90,6 @@ function env_os_linux() {
 }
 
 function env_os_windows() {
-  izopen_os_env="windows"
   system_commands="nc ssh sshpass telnet yad"
   
   ## helper commands
@@ -278,18 +276,22 @@ function helper_ssh() {
   # if tunnel_create=1 add ssh options to create socks tunnel and compression
   [ "$tunnel_create" = 1 ] && helper_opts+=" -D $tunnel_port_create"
   
+  # password less login using sshpass
   # FIXME don't use sshpass outside linux environment because this bug:
   # https://github.com/msys2/MSYS2-packages/issues/2458
-  if [ "$izopen_os_env" = "linux" ]; then
-    # password less login using sshpass
-    if [ ! -z "$password" ]; then
-      # pretty insecure, but the export is needed to avoid printing password into processlist
-      export SSHPASS=$password
-      helper_prepend+="sshpass -e "
-      # debug
-      #echo SSHPASS: $SSHPASS
-    fi
-  fi
+  case $OSTYPE in
+    cygwin*|msys*)
+      ;;
+    *)
+      if [ ! -z "$password" ]; then
+        # pretty insecure, but the export is needed to avoid printing password into processlist
+        export SSHPASS=$password
+        helper_prepend+="sshpass -e "
+        # debug
+        #echo SSHPASS: $SSHPASS
+      fi
+      ;;
+  esac
   
   # launch the uri
   helper_cmd+="${helper_prepend}${helper_cmd[ssh]}${helper_opts}"
@@ -346,7 +348,7 @@ function helper_http() {
         helper_opts+=" --disable-translate"
         helper_opts+=" --password-store=basic"
         helper_opts+=" --proxy-server=\"socks5://localhost:$tunnel_port_use\""
-        case $izopen_os_env in
+        case $OSTYPE in
           cygwin*)
             helper_opts+=" --user-data-dir=\"$(cygpath -w "$izopen_conf_dir/google-chrome/$tunnel_port_use")\""
             ;;
@@ -790,17 +792,19 @@ function uri_open() {
   local password="$uri_password"
   # try to obtain password from clipboard
   if [[ -z "$password" ]]; then
-    if [ "$izopen_os_env" = "windows" ]; then
+    case $OSTYPE in
+      cygwin*|msys*)
         # windows cygwin/msys2 env use the /dev/clipboard for sharing
         local clipboard=$(cat /dev/clipboard)
         #echo -n " " > /dev/clipboard
-      else
+        ;;
+      *)
         local clipboard=$(xsel -b)
         # remove the password from the clipboard
         # FIXME using a workaround because xsel doesn't clean the clipboard contents I use a SPACE here. of course you can't use single space passwords here :)
         echo -n " " | xsel -i -b
-    fi
-
+        ;;
+    esac
     # debug
     #echo clipboard: $clipboard
     #echo xsel: $(xsel -b)
