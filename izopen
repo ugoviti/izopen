@@ -86,6 +86,10 @@ function env_os_linux() {
   : ${helper_sftp_name:="ssh"}
   : ${helper_sftp_cmd:="$helper_sftp_name"}
 
+  # default command for TELNET
+  : ${helper_telnet_name:="telnet"}
+  : ${helper_telnet_cmd:="$helper_telnet_name"}
+  
   # default command for HTTP/S
   #: ${helper_http_cmd:="midori"}
   : ${helper_http_name:="google-chrome"}
@@ -93,8 +97,8 @@ function env_os_linux() {
 
   # default command for RDP
   #: ${helper_rdp_name:="rdesktop"}
-  #: ${helper_rdp_name:="xfreerdp"}
-  : ${helper_rdp_name:="remmina"}
+  : ${helper_rdp_name:="xfreerdp"}
+  #: ${helper_rdp_name:="remmina"}
   : ${helper_rdp_cmd:="$helper_rdp_name"}
 
   # remmina specific, separe with a space every options
@@ -247,7 +251,7 @@ function helper_terminal() {
       helper_terminal_cmd_opts="-T \"$title\""
       ;;
     *)
-      helper_terminal_cmd_opts="--title \"$title\""
+      helper_terminal_cmd_opts="--title=\"$title\""
       ;;
   esac
 }
@@ -291,7 +295,7 @@ function helper_ssh() {
   #######
   ## colorized prompt:
   #helper_cmd="gnome-terminal -e \"ssh $([ -n "$port" ] && echo "-p $port") $username@$host $helper_cmd_opts\""
-  #helper_ssh_cmd_opts="--title \"export PS1='\e[0;31m[\u@\h \W]\$ \e[m '; exec bash\""
+  #helper_ssh_cmd_opts="--title=\"export PS1='\e[0;31m[\u@\h \W]\$ \e[m '; exec bash\""
 }
 
 function helper_telnet() {
@@ -307,7 +311,7 @@ function helper_telnet() {
   [ -n "$port" ] && helper_cmd_opts+=" $port"
 
   # set the final command
-  helper_cmd="${helper_terminal_cmd} $helper_terminal_cmd_opts -e ${helper_cmd_prepend}telnet${helper_cmd_opts}"
+  helper_cmd="${helper_terminal_cmd} $helper_terminal_cmd_opts -e ${helper_cmd_prepend}${helper_telnet_cmd}${helper_cmd_opts}"
 }
 
 function helper_http() {
@@ -377,7 +381,7 @@ function helper_rdp() {
   #username="$(echo "$username" | sed 's/\//\\\\/g')"
 
   if [[ -z "$host" || -z "$username" || -z "$password" || "$username" = "{USERNAME}" || "$password" = "{PASSWORD}" || "$username" = "%7BUSERNAME%7D" || "$password" = "%7BPASSWORD%7D" ]]; then
-    frmdata=$(LANG=C yad --center --width=300 --title "Connect to remote computer" --focus-field=4 --align=right --form --field="Domain" "$domain" --field="Address" "$host" --field="Username" "$username" --field="Password":H "$password" --field="Security":CB 'rdp!tls!^nla!ext' --field="Admin Console":CHK | grep -v "WINDOW DECORATIONS RELOADED")
+    frmdata=$(LANG=C yad --center --width=300 --title="Connect to remote computer" --focus-field=4 --align=right --form --field="Domain" "$domain" --field="Address" "$host" --field="Username" "$username" --field="Password":H "$password" --field="Security":CB 'rdp!tls!^nla!ext' --field="Admin Console":CHK | grep -v "WINDOW DECORATIONS RELOADED")
     [ $? != 0 ] && exit 1
     domain=$(echo $frmdata | awk 'BEGIN {FS="|" } { print $1 }')
     host=$(echo $frmdata | awk 'BEGIN {FS="|" } { print $2 }')
@@ -560,14 +564,14 @@ socks5 127.0.0.1 $tunnel_port_create" > "$izopen_conf_socks_proxy"
 
 # use al already opened tunnel
 function helper_tunnel_use() {
-  #tunnel_port_use=$(LANG=C yad --title "izOpen SSH Proxy" --entry --entry-text=$tunnel_port_use --text="Inserire la porta del Proxy Socks \nCompresa fra $tunnel_port_min e $tunnel_port_max\n" 2>/dev/null)
+  #tunnel_port_use=$(LANG=C yad --title="izOpen SSH Proxy" --entry --entry-text=$tunnel_port_use --text="Inserire la porta del Proxy Socks \nCompresa fra $tunnel_port_min e $tunnel_port_max\n" 2>/dev/null)
 
   if [[ -e "$izopen_conf_socks_port_current" && -z "$tunnel_port_use" ]]; then
     # read the latest tunnel port used if not specified
     tunnel_port_use="$(cat "$izopen_conf_socks_port_current")"
     
     # request if we must use the last used port
-    tunnel_port_use=$(LANG=C yad --center --title "izOpen SSH Proxy" --entry --numeric --entry-text=$tunnel_port_use --text="<b>Inserire la porta del Proxy Socks</b> \nCompresa fra $tunnel_port_min e $tunnel_port_max\n" $tunnel_port_min $tunnel_port_max --timeout=10 --timeout-indicator=bottom | tr -d [:alpha:] | tr -d [:cntrl:] | tr -d [:space:])
+    tunnel_port_use=$(LANG=C yad --center --title="izOpen SSH Proxy" --entry --numeric --entry-text=$tunnel_port_use --text="<b>Inserire la porta del Proxy Socks</b> \nCompresa fra $tunnel_port_min e $tunnel_port_max\n" $tunnel_port_min $tunnel_port_max --timeout=10 --timeout-indicator=bottom | tr -d [:alpha:] | tr -d [:cntrl:] | tr -d [:space:])
   fi 
   
   # save the last used port for later usage
@@ -613,7 +617,7 @@ function print_log_header() {
 }
 
 function print_log_output() {
-  tail -n 350 "${izopen_log_file}" | sed -n "H; /^$(date '+%Y-%m-%d')/h; \${g;p;}" | LANG=C yad --center --width=1000 --height=500 --title "Connection Error" --button="Close":0 --text "Errors from ${izopen_log_file}" --text-info --fontname="Monospace 8"
+  tail -n 350 "${izopen_log_file}" | sed -n "H; /^$(date '+%Y-%m-%d')/h; \${g;p;}" | LANG=C yad --center --width=1000 --height=500 --title="Connection Error" --button="Close":0 --text "Errors from ${izopen_log_file}" --text-info --fontname="Monospace 8"
 }
 
 function print_log_footer() {
@@ -683,7 +687,7 @@ function uri_open() {
   
   # workarounds
   [ "$schema" = "sftp" ] && schema="ssh" # alway use ssh handler with sftp uri
-
+  
   ## customize the following uri for command associations:
   case $schema in
     ssh|telnet|rdp|vnc|sftp|ftp|http|https|about|smb|cifs|file)
@@ -750,7 +754,7 @@ function uri_parser() {
     uri="${uri//\"/%22}"
 
     # top level parsing
-    pattern='^(([a-z]{3,5}):\/\/)?((([^:]+)(:([^@\/]*))?@)?([^:\/?]+)(:([0-9]+))?)(\/[^?]*)?(\?[^#]*)?(#.*)?$'
+    pattern='^(([a-z]{3,6}):\/\/)?((([^:]+)(:([^@\/]*))?@)?([^:\/?]+)(:([0-9]+))?)(\/[^?]*)?(\?[^#]*)?(#.*)?$'
     [[ "$uri" =~ $pattern ]] || return 1;
 
     # component extraction
