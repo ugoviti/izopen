@@ -27,6 +27,10 @@ VERSION_DATE="20220715"
 ## KeePassX 2.x integration (Fedora >= 23):
 ##        dnf install -y yad kdelibs3 proxychains-ng keepassx
 
+schema_supported="ssh|telnet|rdp|vnc|sftp|ftp|http|https|about|smb|cifs|file"
+
+# declare the following variables as global array
+declare -A helper_name helper_cmd helper_opts helper_conf
 
 ## mandatory system commands based on operating system
 #########################################################################
@@ -36,64 +40,64 @@ function env_os_linux() {
 
   ## helper commands
   #########################################################################
-
+  
   # default command for SSH
-  : ${helper_ssh_name:="ssh"}
-  : ${helper_ssh_cmd:="$helper_ssh_name"}
-
+  : ${helper_name[ssh]:="ssh"}
+  : ${helper_cmd[ssh]:="${helper_name[ssh]}"}
+ 
   # default command for SFTP
-  : ${helper_sftp_name:="ssh"}
-  : ${helper_sftp_cmd:="$helper_sftp_name"}
+  : ${helper_name[sftp]:="ssh"}
+  : ${helper_cmd[sftp]:="${helper_name[sftp]}"}
 
   # default command for TELNET
-  : ${helper_telnet_name:="telnet"}
-  : ${helper_telnet_cmd:="$helper_telnet_name"}
-  
+  : ${helper_name[telnet]:="telnet"}
+  : ${helper_cmd[telnet]:="${helper_name[telnet]}"}
+
   # default command for HTTP/S
-  #: ${helper_http_cmd:="midori"}
-  : ${helper_http_name:="google-chrome"}
-  : ${helper_http_cmd:="$helper_http_name"}
+  #: ${helper_cmd[http]:="midori"}
+  : ${helper_name[http]:="google-chrome"}
+  : ${helper_cmd[http]:="${helper_name[http]}"}
 
   # default command for RDP
-  #: ${helper_rdp_name:="rdesktop"}
-  #: ${helper_rdp_name:="xfreerdp"}
-  : ${helper_rdp_name:="remmina"}
-  : ${helper_rdp_cmd:="$helper_rdp_name"}
+  #: ${helper_name[rdp]:="rdesktop"}
+  #: ${helper_name[rdp]:="xfreerdp"}
+  : ${helper_name[rdp]:="remmina"}
+  : ${helper_cmd[rdp]:="${helper_name[rdp]}"}
 
   # remmina specific, separe with a space every options
-  : ${helper_rdp_cmd_remmina_conf:="drive=/tmp"}
+  : ${helper_conf[rdp]:="drive=/tmp"}
 
   # # default command for VNC
-  : ${helper_vnc_name:="vncviewer"}
-  : ${helper_vnc_cmd:="$helper_vnc_name"}
+  : ${helper_name[vnc]:="vncviewer"}
+  : ${helper_vnc_cmd:="${helper_name[vnc]}"}
 
   # # default command for FTP
-  : ${helper_ftp_name:="xdg-open"}
-  : ${helper_ftp_cmd:="$helper_ftp_name"}
+  : ${helper_name[ftp]:="xdg-open"}
+  : ${helper_cmd[ftp]:="${helper_name[ftp]}"}
 
   # # default command for SMB/CIFS
-  : ${helper_smb_name:="xdg-open"}
-  : ${helper_smb_cmd:="$helper_smb_name"}
-  : ${helper_cifs_name:="xdg-open"}
-  : ${helper_cifs_cmd:="$helper_cifs_name"}
+  : ${helper_name[smb]:="xdg-open"}
+  : ${helper_cmd[smb]:="${helper_name[smb]}"}
+  : ${helper_name[cifs]:="xdg-open"}
+  : ${helper_cmd[cifs]:="${helper_name[cifs]}"}
 
   # default terminal app
   # define the command to use based on current desktop environment
   if   [ "$XDG_CURRENT_DESKTOP" = "MATE" ]; then
-      : ${helper_terminal_name:="$(gsettings get org.mate.applications-terminal exec | tr -d \')"}
+      : ${helper_name[terminal]:="$(gsettings get org.mate.applications-terminal exec | tr -d \')"}
   elif [ "$XDG_CURRENT_DESKTOP" = "GNOME" ]; then
-      : ${helper_terminal_name:="$(gsettings get org.gnome.desktop.default-applications.terminal exec | tr -d \')"}
+      : ${helper_name[terminal]:="$(gsettings get org.gnome.desktop.default-applications.terminal exec | tr -d \')"}
   elif [ "$XDG_CURRENT_DESKTOP" = "KDE" ]; then
-      #helper_terminal_cmd:="$(kreadconfig --file kdeglobals --group General --key TerminalApplication | tr -d \')"}
-      : ${helper_terminal_name:="konsole"}
+      #helper_cmd[terminal]:="$(kreadconfig --file kdeglobals --group General --key TerminalApplication | tr -d \')"}
+      : ${helper_name[terminal]:="konsole"}
   elif [ "$XDG_CURRENT_DESKTOP" = "XFCE" ]; then
-      : ${helper_terminal_name:="exo-open --launch TerminalEmulator"}
+      : ${helper_name[terminal]:="exo-open --launch TerminalEmulator"}
   elif [ "$XDG_CURRENT_DESKTOP" = "Pantheon" ]; then
-      : ${helper_terminal_name:="exo-open --launch TerminalEmulator"}
+      : ${helper_name[terminal]:="exo-open --launch TerminalEmulator"}
     else
-      : ${helper_terminal_name:="xterm"}
+      : ${helper_name[terminal]:="xterm"}
   fi
-  : ${helper_terminal_cmd:="$helper_terminal_name"}
+  : ${helper_cmd[terminal]:="${helper_name[terminal]}"}
 }
 
 function env_os_windows() {
@@ -103,38 +107,38 @@ function env_os_windows() {
   ## helper commands
   #########################################################################
   # default command for SSH
-  : ${helper_ssh_name:="ssh"}
-  : ${helper_ssh_cmd:="$helper_ssh_name"}
+  : ${helper_name[ssh]:="ssh"}
+  : ${helper_cmd[ssh]:="${helper_name[ssh]}"}
 
   # default command for SFTP
-  : ${helper_sftp_name:="ssh"}
-  : ${helper_sftp_cmd:="$helper_sftp_name"}
+  : ${helper_name[sftp]:="ssh"}
+  : ${helper_cmd[sftp]:="${helper_name[sftp]}"}
 
   # default command for HTTP/S
-  : ${helper_http_name:="google-chrome"}
-  : ${helper_http_cmd:="/c/Program\ Files/Google/Chrome/Application/chrome.exe"}
+  : ${helper_name[http]:="google-chrome"}
+  : ${helper_cmd[http]:="/c/Program\ Files/Google/Chrome/Application/chrome.exe"}
 
   # default command for RDP
-  : ${helper_rdp_name:="xfreerdp"}
-  : ${helper_rdp_cmd:="$helper_rdp_name"}
+  : ${helper_name[rdp]:="xfreerdp"}
+  : ${helper_cmd[rdp]:="${helper_name[rdp]}"}
 
   # # default command for VNC
-  : ${helper_vnc_name:="vncviewer"}
-  : ${helper_vnc_cmd:="$helper_vnc_name"}
+  : ${helper_name[vnc]:="vncviewer"}
+  : ${helper_vnc_cmd:="${helper_name[vnc]}"}
 
   # # default command for FTP
-  : ${helper_ftp_name:="xdg-open"}
-  : ${helper_ftp_cmd:="$helper_ftp_name"}
+  : ${helper_name[ftp]:="xdg-open"}
+  : ${helper_cmd[ftp]:="${helper_name[ftp]}"}
 
   # # default command for SMB/CIFS
-  : ${helper_smb_name:="xdg-open"}
-  : ${helper_smb_cmd:="$helper_smb_name"}
-  : ${helper_cifs_name:="xdg-open"}
-  : ${helper_cifs_cmd:="$helper_cifs_name"}
+  : ${helper_name[smb]:="xdg-open"}
+  : ${helper_cmd[smb]:="${helper_name[smb]}"}
+  : ${helper_name[cifs]:="xdg-open"}
+  : ${helper_cmd[cifs]:="${helper_name[cifs]}"}
   
   # default terminal app
-  : ${helper_terminal_name:="mintty"}
-  : ${helper_terminal_cmd:="$helper_terminal_name"}
+  : ${helper_name[terminal]:="mintty"}
+  : ${helper_cmd[terminal]:="${helper_name[terminal]}"}
 }
 
 # detect operating system and import the right system variables
@@ -185,42 +189,42 @@ izopen_log_file="$izopen_conf_dir/izopen.log"
 function make_default_config() {
   cat <<EOF
 ## terminal options
-#helper_terminal_name="konsole"
-#helper_terminal_cmd="konsole"
-#helper_terminal_cmd_opts=" --noclose"
+#helper_name[terminal]="konsole"
+#helper_cmd[terminal]="konsole"
+#helper_opts[terminal]=" --noclose"
 
 # ssh options
-#helper_ssh_name="ssh"
-#helper_ssh_cmd="ssh"
-#helper_ssh_cmd_opts=" -z"
+#helper_name[ssh]="ssh"
+#helper_cmd[ssh]="ssh"
+#helper_opts[ssh]=" -z"
 
 ## rdp options (remmina)
-#helper_rdp_name="remmina"
-#helper_rdp_cmd="remmina"
-#helper_rdp_cmd_remmina_conf="drive=/tmp"
+#helper_name[rdp]="remmina"
+#helper_cmd[rdp]="remmina"
+#helper_conf[rdp]="drive=/tmp"
 
 ## rdp options (freerdp)
-#helper_rdp_name="xfreerdp"
-#helper_rdp_cmd="xfreerdp"
-#helper_rdp_cmd_opts="/drive:/tmp"
+#helper_name[rdp]="xfreerdp"
+#helper_cmd[rdp]="xfreerdp"
+#helper_opts[rdp]="/drive:/tmp"
 
 ## browser options
-#helper_http_name="google-chrome"
-#helper_http_cmd="google-chrome"
-#helper_http_cmd_opts="--proxy-bypass-list='<-loopback>'"
+#helper_name[http]="google-chrome"
+#helper_cmd[http]="google-chrome"
+#helper_opts[http]="--proxy-bypass-list='<-loopback>'"
 
 # others uri
-#helper_ftp_name="xdg-open"
-#helper_ftp_cmd="xdg-open"
+#helper_name[ftp]="xdg-open"
+#helper_cmd[ftp]="xdg-open"
 
-#helper_telnet_name="telnet"
-#helper_telnet_cmd="telnet"
+#helper_name[telnet]="telnet"
+#helper_cmd[telnet]="telnet"
 
-#helper_smb_name="xdg-open"
-#helper_smb_cmd="xdg-open"
+#helper_name[smb]="xdg-open"
+#helper_cmd[smb]="xdg-open"
 
-#helper_cifs_name="xdg-open"
-#helper_cifs_cmd="xdg-open"
+#helper_name[cifs]="xdg-open"
+#helper_cmd[cifs]="xdg-open"
 
 ## misc options
 #debug=1
@@ -244,7 +248,7 @@ function check_helper_cmd() {
 }
 
 function helper_terminal() {
-  check_helper_cmd "$helper_terminal_cmd"
+  check_helper_cmd "${helper_cmd[terminal]}"
 
   if [ "$tunnel_create" = 1 ]; then
      title="H:$host P:$tunnel_port_create [MASTER]"
@@ -252,31 +256,32 @@ function helper_terminal() {
      title="H:$host P:$tunnel_port_create [SLAVE]"
   fi
 
-  case $helper_terminal_name in
+  case ${helper_name[terminal]} in
     konsole)
-      #helper_terminal_cmd_opts="-p tabtitle='(%u) %H'"
-      helper_terminal_cmd_opts+=" -p tabtitle='$title'"
-      helper_terminal_cmd_opts+=" -p RemoteTabTitleFormat='$title'"
-      #helper_terminal_cmd_opts+=" --noclose"
+      #helper_opts[terminal]="-p tabtitle='(%u) %H'"
+      helper_opts[terminal]+=" -p tabtitle='$title'"
+      helper_opts[terminal]+=" -p RemoteTabTitleFormat='$title'"
+      #helper_opts[terminal]+=" --noclose"
       ;;
     mintty)
-      helper_terminal_cmd_opts="-T \"$title\""
+      helper_opts[terminal]="-T \"$title\""
       ;;
     *)
-      helper_terminal_cmd_opts="--title=\"$title\""
+      #echo helper_name[terminal]: ${helper_name[terminal]}
+      helper_opts[terminal]=" --title=\"$title\""
       ;;
   esac
 }
 
 function helper_ssh() {
-  check_helper_cmd "$helper_ssh_cmd"
+  check_helper_cmd "${helper_cmd[ssh]}"
   helper_terminal
 
   #[ -z "$username" ] && read -p "username: " username;
   #[ -z "$password" ] && read -p "password: " password;
   
   # manage non mandatory cmd options
-  helper_cmd_opts="${helper_ssh_cmd_opts}"  
+  helper_cmd_opts="${helper_opts[ssh]}"  
   # add username, otherwise use the current logged in user
   [ ! -z "$username" ] && helper_cmd_opts+=" $username@$host" || helper_cmd_opts+=" $host"
   # add the port if not default 22
@@ -300,40 +305,40 @@ function helper_ssh() {
   fi
 
   # set the final command
-  helper_cmd="${helper_terminal_cmd} $helper_terminal_cmd_opts -e ${helper_cmd_prepend}${helper_ssh_cmd}${helper_cmd_opts}"
+  helper_cmd="${helper_cmd[terminal]} ${helper_opts[terminal]} -e ${helper_cmd_prepend}${helper_cmd[ssh]}${helper_cmd_opts}"
 
   #######
   ## TEST
   #######
   ## colorized prompt:
-  #helper_cmd="gnome-terminal -e \"ssh $([ -n "$port" ] && echo "-p $port") $username@$host $helper_cmd_opts\""
-  #helper_ssh_cmd_opts="--title=\"export PS1='\e[0;31m[\u@\h \W]\$ \e[m '; exec bash\""
+  #helper_cmd="gnome-terminal -e \"ssh $([ -n "$port" ] && echo "-p $port") $username@$host ${helper_cmd_opts}\""
+  #helper_opts[ssh]="--title=\"export PS1='\e[0;31m[\u@\h \W]\$ \e[m '; exec bash\""
 }
 
 function helper_telnet() {
-  check_helper_cmd "$helper_telnet_cmd"
+  check_helper_cmd "${helper_cmd[telnet]}"
   helper_terminal
   
   #[ -z "$username" ] && read -p "username: " username;
   #[ -z "$password" ] && read -p "password: " password;
   
   # manage non mandatory cmd options
-  helper_cmd_opts="${helper_telnet_cmd_opts}"
+  helper_cmd_opts="${helper_opts[telnet]}"
   helper_cmd_opts+=" $host"
   [ -n "$port" ] && helper_cmd_opts+=" $port"
 
   # set the final command
-  helper_cmd="${helper_terminal_cmd} $helper_terminal_cmd_opts -e ${helper_cmd_prepend}${helper_telnet_cmd}${helper_cmd_opts}"
+  helper_cmd="${helper_cmd[terminal]} ${helper_opts[terminal]} -e ${helper_cmd_prepend}${helper_cmd[telnet]}${helper_cmd_opts}"
 }
 
 function helper_http() {
-  check_helper_cmd "$helper_http_cmd"
+  check_helper_cmd "${helper_cmd[http]}"
   
   # manage non mandatory cmd options
-  helper_cmd_opts="${helper_http_cmd_opts}"
+  helper_cmd_opts="${helper_opts[http]}"
   
   # run the connection
-  case $helper_http_name in
+  case ${helper_name[http]} in
     google-chrome)
       # open the browser with this options only on tunnel connection
       if [ $tunnel_use = 1 ]; then
@@ -349,26 +354,26 @@ function helper_http() {
         helper_cmd_opts+=" --proxy-server=\"socks5://localhost:$tunnel_port_use\""
         helper_cmd_opts+=" --user-data-dir=\"$izopen_conf_dir/google-chrome/$tunnel_port_use\""
       fi
-      # because this helper doesn't works via proxychains wrapper, don't use the $helper_cmd_prepend command
+      # because this helper doesn't works via proxychains wrapper, don't use the ${helper_cmd_prepend} command
       unset helper_cmd_prepend
       ;;
     midori)
       helper_cmd_opts+=" -c \"$izopen_conf_dir/midori/$tunnel_port_use\""
       ;;
     *)
-      helper_http_cmd="xdg-open"
+      helper_cmd[http]="xdg-open"
       ;;
   esac
   
   # launch the uri
-  helper_cmd="${helper_cmd_prepend}${helper_http_cmd} ${helper_cmd_opts} ${uri}"
+  helper_cmd="${helper_cmd_prepend}${helper_cmd[http]} ${helper_cmd_opts} ${uri}"
 }
 
 function helper_rdp() {
-  check_helper_cmd "$helper_rdp_cmd"
+  check_helper_cmd "${helper_cmd[rdp]}"
   
   # manage non mandatory cmd options
-  helper_cmd_opts="${helper_rdp_cmd_opts}"
+  helper_cmd_opts="${helper_opts[rdp]}"
 
   # obtain general info used by all rdp commands
   ## extract windows domain from username and convert to the right name
@@ -406,7 +411,7 @@ function helper_rdp() {
   fi
 
   # run the connection
-  case $helper_rdp_name in
+  case ${helper_name[rdp]} in
     rdesktop)
       helper_cmd_opts+=" -k it -g 1280x780"
       [ -n "$domain" ]   && helper_cmd_opts+=" -d '$domain'"
@@ -414,7 +419,7 @@ function helper_rdp() {
       [ -n "$password" ] && helper_cmd_opts+=" -p '$password'"
       [ -n "$port" ]     && port=":$port"
 
-      helper_cmd="${helper_cmd_prepend}${helper_rdp_cmd} ${helper_cmd_opts} ${host}${port}"
+      helper_cmd="${helper_cmd_prepend}${helper_cmd[rdp]} ${helper_cmd_opts} ${host}${port}"
       ;;
     xfreerdp)
       # FIXME: this function always use the default keyboard
@@ -436,10 +441,10 @@ function helper_rdp() {
       # proxy tunnel manage
       [ $tunnel_use = 1 ] && helper_cmd_opts+=" /proxy:socks5://localhost:$tunnel_port_use"
       
-      # because this helper doesn't works via proxychains wrapper, don't use the $helper_cmd_prepend command
+      # because this helper doesn't works via proxychains wrapper, don't use the ${helper_cmd_prepend} command
       unset helper_cmd_prepend
       
-      helper_cmd="${helper_cmd_prepend}${helper_rdp_cmd} ${helper_cmd_opts} /v:${host}"
+      helper_cmd="${helper_cmd_prepend}${helper_cmd[rdp]} ${helper_cmd_opts} /v:${host}"
       ;;
     remmina)
       izopen_conf_remmina_dir="$izopen_conf_dir/remmina"
@@ -462,40 +467,40 @@ server=$host
 $([ ! -z "$domain" ] && echo "domain=$domain")
 $([ ! -z "$username" ] && echo "username=$username")
 $([ ! -z "$password" ] && echo "password=$password")
-$(for remmina_conf in ${helper_rdp_cmd_remmina_conf}; do echo -e "$remmina_conf\n";done)
+$(for remmina_conf in ${helper_conf[rdp]}; do echo -e "$remmina_conf\n";done)
 EOF
       }
       
       make_remmina_conf > "${izopen_conf_remmina_host}"
       
-      # because this helper doesn't works via proxychains wrapper, don't use the $helper_cmd_prepend command
+      # because this helper doesn't works via proxychains wrapper, don't use the ${helper_cmd_prepend} command
       unset helper_cmd_prepend
       
-      helper_cmd="${helper_cmd_prepend}${helper_rdp_cmd} ${helper_cmd_opts} -c ${izopen_conf_remmina_host}"
+      helper_cmd="${helper_cmd_prepend}${helper_cmd[rdp]} ${helper_cmd_opts} -c ${izopen_conf_remmina_host}"
       ;;
   esac
 }
 
 function helper_vnc() {
-  check_helper_cmd "$helper_vnc_cmd"
+  check_helper_cmd "${helper_vnc_cmd}"
   # manage non mandatory cmd options
-  helper_cmd_opts="${helper_vnc_cmd_opts}"
+  helper_cmd_opts="${helper_opts[vnc]}"
   
   # vnc doesn't support username and actually don't accept the password. use the gnome keyring instead for this
   #helper_cmd="vinagre $schema://$host$([ -n $port ] && echo ":$port")"
   [ -n $port ] && helper_cmd_opts+=":$port"
-  helper_cmd="$helper_vnc_cmd ${host}${helper_cmd_opts}"
+  helper_cmd="${helper_vnc_cmd} ${host}${helper_cmd_opts}"
 }
 
 function helper_sftp() {
-  check_helper_cmd "$helper_sftp_cmd"
+  check_helper_cmd "${helper_cmd[sftp]}"
   #helper_cmd="xdg-open \"$uri\""
   helper_cmd="helper_ssh \"$uri\""
 }
 
 function helper_ftp() {
-  check_helper_cmd "$helper_ftp_cmd"
-  helper_cmd="${helper_cmd_prepend}${helper_ftp_cmd} ${helper_cmd_opts} \"${uri}\""
+  check_helper_cmd "${helper_cmd[ftp]}"
+  helper_cmd="${helper_cmd_prepend}${helper_cmd[ftp]} ${helper_cmd_opts} \"${uri}\""
 }
 
 function helper_https() {
@@ -507,13 +512,13 @@ function helper_about() {
 }
 
 function helper_smb() {
-  check_helper_cmd "$helper_smb_cmd"
-  helper_cmd="${helper_cmd_prepend}${helper_smb_cmd} ${helper_cmd_opts} \"${uri}\""
+  check_helper_cmd "${helper_cmd[smb]}"
+  helper_cmd="${helper_cmd_prepend}${helper_cmd[smb]} ${helper_cmd_opts} \"${uri}\""
 }
 
 function helper_cifs() {
-  check_helper_cmd "$helper_cifs_cmd"
-  helper_cmd="${helper_cmd_prepend}${helper_cifs_cmd} ${helper_cmd_opts} \"${uri}\""
+  check_helper_cmd "${helper_cmd[cifs]}"
+  helper_cmd="${helper_cmd_prepend}${helper_cmd[cifs]} ${helper_cmd_opts} \"${uri}\""
 }
 
 # SYSTEM FUNCTIONS
@@ -646,17 +651,17 @@ function print_log_debug() {
   # print the parsed fields
   echo "-- debug -------------------------------------------------------------------------------"
   cat <<EOF
-                uri: $uri
-             schema: $schema
-           username: $username
-           password: $password
-               host: $host
-               port: $port
-               path: $path
-      tunnel_create: $tunnel_create - port: $tunnel_port_create
-         tunnel_use: $tunnel_use - port: $tunnel_port_use
- helper_cmd_prepend: $helper_cmd_prepend
-                cmd: $helper_cmd
+                uri: ${uri}
+             schema: ${schema}
+           username: ${username}
+           password: ${password}
+               host: ${host}
+               port: ${port}
+               path: ${path}
+      tunnel_create: ${tunnel_create} - port: ${tunnel_port_create}
+         tunnel_use: ${tunnel_use} - port: ${tunnel_port_use}
+ helper_cmd_prepend: ${helper_cmd_prepend}
+                cmd: ${helper_cmd}
 EOF
   echo "----------------------------------------------------------------------------------------"
 }
@@ -730,7 +735,7 @@ function uri_open() {
         print_log_header
 
         # make the connection to the remote server
-        eval "$helper_cmd"
+        eval "${helper_cmd}"
         RETVAL=$?
         
         # debug
