@@ -30,6 +30,72 @@ VERSION_DATE="20220715"
 
 ## mandatory system commands based on operating system
 #########################################################################
+function env_os_linux() {
+  izopen_os_env="linux"
+  system_commands="yad nc xdg-open ssh sshpass telnet xsel proxychains"
+
+  ## helper commands
+  #########################################################################
+
+  # default command for SSH
+  : ${helper_ssh_name:="ssh"}
+  : ${helper_ssh_cmd:="$helper_ssh_name"}
+
+  # default command for SFTP
+  : ${helper_sftp_name:="ssh"}
+  : ${helper_sftp_cmd:="$helper_sftp_name"}
+
+  # default command for TELNET
+  : ${helper_telnet_name:="telnet"}
+  : ${helper_telnet_cmd:="$helper_telnet_name"}
+  
+  # default command for HTTP/S
+  #: ${helper_http_cmd:="midori"}
+  : ${helper_http_name:="google-chrome"}
+  : ${helper_http_cmd:="$helper_http_name"}
+
+  # default command for RDP
+  #: ${helper_rdp_name:="rdesktop"}
+  #: ${helper_rdp_name:="xfreerdp"}
+  : ${helper_rdp_name:="remmina"}
+  : ${helper_rdp_cmd:="$helper_rdp_name"}
+
+  # remmina specific, separe with a space every options
+  : ${helper_rdp_cmd_remmina_conf:="drive=/tmp"}
+
+  # # default command for VNC
+  : ${helper_vnc_name:="vncviewer"}
+  : ${helper_vnc_cmd:="$helper_vnc_name"}
+
+  # # default command for FTP
+  : ${helper_ftp_name:="xdg-open"}
+  : ${helper_ftp_cmd:="$helper_ftp_name"}
+
+  # # default command for SMB/CIFS
+  : ${helper_smb_name:="xdg-open"}
+  : ${helper_smb_cmd:="$helper_smb_name"}
+  : ${helper_cifs_name:="xdg-open"}
+  : ${helper_cifs_cmd:="$helper_cifs_name"}
+
+  # default terminal app
+  # define the command to use based on current desktop environment
+  if   [ "$XDG_CURRENT_DESKTOP" = "MATE" ]; then
+      : ${helper_terminal_name:="$(gsettings get org.mate.applications-terminal exec | tr -d \')"}
+  elif [ "$XDG_CURRENT_DESKTOP" = "GNOME" ]; then
+      : ${helper_terminal_name:="$(gsettings get org.gnome.desktop.default-applications.terminal exec | tr -d \')"}
+  elif [ "$XDG_CURRENT_DESKTOP" = "KDE" ]; then
+      #helper_terminal_cmd:="$(kreadconfig --file kdeglobals --group General --key TerminalApplication | tr -d \')"}
+      : ${helper_terminal_name:="konsole"}
+  elif [ "$XDG_CURRENT_DESKTOP" = "XFCE" ]; then
+      : ${helper_terminal_name:="exo-open --launch TerminalEmulator"}
+  elif [ "$XDG_CURRENT_DESKTOP" = "Pantheon" ]; then
+      : ${helper_terminal_name:="exo-open --launch TerminalEmulator"}
+    else
+      : ${helper_terminal_name:="xterm"}
+  fi
+  : ${helper_terminal_cmd:="$helper_terminal_name"}
+}
+
 function env_os_windows() {
   izopen_os_env="windows"
   system_commands="nc ssh sshpass telnet yad"
@@ -68,72 +134,6 @@ function env_os_windows() {
   
   # default terminal app
   : ${helper_terminal_name:="mintty"}
-  : ${helper_terminal_cmd:="$helper_terminal_name"}
-}
-
-function env_os_linux() {
-  izopen_os_env="linux"
-  system_commands="yad nc xdg-open ssh sshpass telnet xsel proxychains xfreerdp remmina"
-
-  ## helper commands
-  #########################################################################
-
-  # default command for SSH
-  : ${helper_ssh_name:="ssh"}
-  : ${helper_ssh_cmd:="$helper_ssh_name"}
-
-  # default command for SFTP
-  : ${helper_sftp_name:="ssh"}
-  : ${helper_sftp_cmd:="$helper_sftp_name"}
-
-  # default command for TELNET
-  : ${helper_telnet_name:="telnet"}
-  : ${helper_telnet_cmd:="$helper_telnet_name"}
-  
-  # default command for HTTP/S
-  #: ${helper_http_cmd:="midori"}
-  : ${helper_http_name:="google-chrome"}
-  : ${helper_http_cmd:="$helper_http_name"}
-
-  # default command for RDP
-  #: ${helper_rdp_name:="rdesktop"}
-  : ${helper_rdp_name:="xfreerdp"}
-  #: ${helper_rdp_name:="remmina"}
-  : ${helper_rdp_cmd:="$helper_rdp_name"}
-
-  # remmina specific, separe with a space every options
-  : ${helper_rdp_cmd_conf_remmina:="drive=/tmp"}
-
-  # # default command for VNC
-  : ${helper_vnc_name:="vncviewer"}
-  : ${helper_vnc_cmd:="$helper_vnc_name"}
-
-  # # default command for FTP
-  : ${helper_ftp_name:="xdg-open"}
-  : ${helper_ftp_cmd:="$helper_ftp_name"}
-
-  # # default command for SMB/CIFS
-  : ${helper_smb_name:="xdg-open"}
-  : ${helper_smb_cmd:="$helper_smb_name"}
-  : ${helper_cifs_name:="xdg-open"}
-  : ${helper_cifs_cmd:="$helper_cifs_name"}
-
-  # default terminal app
-  # define the command to use based on current desktop environment
-  if   [ "$XDG_CURRENT_DESKTOP" = "MATE" ]; then
-      : ${helper_terminal_name:="$(gsettings get org.mate.applications-terminal exec | tr -d \')"}
-  elif [ "$XDG_CURRENT_DESKTOP" = "GNOME" ]; then
-      : ${helper_terminal_name:="$(gsettings get org.gnome.desktop.default-applications.terminal exec | tr -d \')"}
-  elif [ "$XDG_CURRENT_DESKTOP" = "KDE" ]; then
-      #helper_terminal_cmd:="$(kreadconfig --file kdeglobals --group General --key TerminalApplication | tr -d \')"}
-      : ${helper_terminal_name:="konsole"}
-  elif [ "$XDG_CURRENT_DESKTOP" = "XFCE" ]; then
-      : ${helper_terminal_name:="exo-open --launch TerminalEmulator"}
-  elif [ "$XDG_CURRENT_DESKTOP" = "Pantheon" ]; then
-      : ${helper_terminal_name:="exo-open --launch TerminalEmulator"}
-    else
-      : ${helper_terminal_name:="xterm"}
-  fi
   : ${helper_terminal_cmd:="$helper_terminal_name"}
 }
 
@@ -185,29 +185,41 @@ izopen_log_file="$izopen_conf_dir/izopen.log"
 function make_default_config() {
   cat <<EOF
 ## terminal options
+#helper_terminal_name="konsole"
 #helper_terminal_cmd="konsole"
 #helper_terminal_cmd_opts=" --noclose"
 
 # ssh options
+#helper_ssh_name="ssh"
 #helper_ssh_cmd="ssh"
 #helper_ssh_cmd_opts=" -z"
 
 ## rdp options (remmina)
+#helper_rdp_name="remmina"
 #helper_rdp_cmd="remmina"
-#helper_rdp_cmd_conf_remmina="drive=/tmp"
+#helper_rdp_cmd_remmina_conf="drive=/tmp"
 
 ## rdp options (freerdp)
+#helper_rdp_name="xfreerdp"
 #helper_rdp_cmd="xfreerdp"
 #helper_rdp_cmd_opts="/drive:/tmp"
 
 ## browser options
+#helper_http_name="google-chrome"
 #helper_http_cmd="google-chrome"
 #helper_http_cmd_opts="--proxy-bypass-list='<-loopback>'"
 
 # others uri
+#helper_ftp_name="xdg-open"
 #helper_ftp_cmd="xdg-open"
+
+#helper_telnet_name="telnet"
 #helper_telnet_cmd="telnet"
+
+#helper_smb_name="xdg-open"
 #helper_smb_cmd="xdg-open"
+
+#helper_cifs_name="xdg-open"
 #helper_cifs_cmd="xdg-open"
 
 ## misc options
@@ -421,6 +433,12 @@ function helper_rdp() {
       [ ! -z "$security" ] && helper_cmd_opts+=" /sec:$security"
       [ "$console" = "TRUE" ] && helper_cmd_opts+=" /console"
       
+      # proxy tunnel manage
+      [ $tunnel_use = 1 ] && helper_cmd_opts+=" /proxy:socks5://localhost:$tunnel_port_use"
+      
+      # because this helper doesn't works via proxychains wrapper, don't use the $helper_cmd_prepend command
+      unset helper_cmd_prepend
+      
       helper_cmd="${helper_cmd_prepend}${helper_rdp_cmd} ${helper_cmd_opts} /v:${host}"
       ;;
     remmina)
@@ -444,7 +462,7 @@ server=$host
 $([ ! -z "$domain" ] && echo "domain=$domain")
 $([ ! -z "$username" ] && echo "username=$username")
 $([ ! -z "$password" ] && echo "password=$password")
-$(for remmina_conf in ${helper_rdp_cmd_conf_remmina}; do echo -e "$remmina_conf\n";done)
+$(for remmina_conf in ${helper_rdp_cmd_remmina_conf}; do echo -e "$remmina_conf\n";done)
 EOF
       }
       
@@ -703,7 +721,7 @@ function uri_open() {
       # manage the use or creation of ssh tunnel
       [[ "$tunnel_create" = 1 || "$tunnel_use" = 1 ]] && helper_tunnel_manage "$uri"
       
-      TRY=1; TRYMAX=3
+      TRY=1; TRYMAX=2
       until [ $TRY -ge $TRYMAX ]; do
         # obtain commands to use to connect
         helper_${schema} "$uri"
