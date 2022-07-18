@@ -174,7 +174,7 @@ function make_default_config() {
 
 # ssh options
 #helper_cmd[ssh]="ssh"
-#helper_opts[ssh]="-z"
+helper_opts[ssh]="-o StrictHostKeyChecking=no -o CheckHostIP=no"
 
 # rdp options (remmina)
 #helper_cmd[rdp]="remmina"
