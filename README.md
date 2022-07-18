@@ -199,3 +199,12 @@ echo 'PATH=$HOME/.local/bin:$PATH' >> ~/.bashrc
 
 ## Usage (with examples):
 `izopen -h`
+
+## Customize izopen configuration:
+All user custom configurations are located into:
+- `$HOME/.config/izopen/izopen.conf`
+
+The file is created if not exist on izopen first run.  
+
+If you want overwrite the config file with the default options (after upgrade for exampe) run:
+- `izopen --mkconfig`
