@@ -141,7 +141,6 @@ _PROG=$( echo ${0##*/} )     # define the command name
 : ${tunnel_create:=1}        # try to create a new ssh tunnel when connecting via ssh
 : ${tunnel_use:=1}           # use the existing ssh tunnel
 : ${tunnel_use_force:=0}     # always use the tunnel for every opened uri
-: ${tunnel_use_force_ssh:=0} # request the usage of estabilished ssh tunnel when connecting via ssh. this make possible to create a tunnel in a tunnel
 : ${tunnel_port_min:=2000}   # minimun tunnel port number to use
 : ${tunnel_port_max:=4999}   # maximun tunnel port number to use
 
@@ -203,7 +202,7 @@ function make_default_config() {
 ## misc options
 #debug=1
 #nc_opts="-z" 
-#tunnel_use_force_ssh=0
+#tunnel_use_force=0
 EOF
 }
 
@@ -639,7 +638,7 @@ function helper_tunnel_manage() {
   case ${schema} in
     ssh)
         # by default don't use tunnel if the schema is ssh and is not forced
-        [ "$tunnel_use_force_ssh" = 0 ] && tunnel_use=0
+        [ "$tunnel_use_force" = 0 ] && tunnel_use=0
         helper_tunnel_create
         ;;
   esac
@@ -967,7 +966,6 @@ while [ $# -gt 0 ]; do
     -f|--force-tunnel)
       # force usage of estabilished tunnel for all uri schema
       tunnel_use_force=1
-      tunnel_use_force_ssh=1
       ;;
     -p|--port)
       # specify the tunnel port to use (ssh schema excluded). it involves --force-tunnel
