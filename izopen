@@ -202,6 +202,7 @@ function make_default_config() {
 ## misc options
 #debug=1
 #nc_opts="-z" 
+#terminal_use=0
 #tunnel_use_force=1
 EOF
 }
