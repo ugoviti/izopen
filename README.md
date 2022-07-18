@@ -204,7 +204,12 @@ echo 'PATH=$HOME/.local/bin:$PATH' >> ~/.bashrc
 All user custom configurations are located into:
 - `$HOME/.config/izopen/izopen.conf`
 
-The file is created if not exist on izopen first run.  
+The file is created on izopen first run (if not exist).  
 
 If you want overwrite the config file with the default options (after upgrade for exampe) run:
 - `izopen --mkconfig`
+
+NB. by default this configuration is enabled:
+`helper_opts[ssh]="-o StrictHostKeyChecking=no -o CheckHostIP=no"`
+WARNING: it involves security concerns, but are required by sshpass for the first time to a new host.
+If you dont't want use these options enabled, disable from your user config file.
