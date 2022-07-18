@@ -107,7 +107,7 @@ echo '#!/usr/bin/env xdg-open
 Version=1.0
 Name=izOpen Web Browser
 Comment=Browse the Web through the specified local proxy socks port connected via SSH tunnnel
-Exec=izopen -t
+Exec=izopen -f
 StartupNotify=true
 Terminal=false
 Type=Application
