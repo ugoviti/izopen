@@ -1,8 +1,8 @@
 #!/bin/bash
 NAME="izopen"
 DESCRIPTION="multi protocol bash script to auto opening given URI and auto creating ssh reverse tunnel socks proxy"
-VERSION="3.0.0"
-VERSION_DATE="20220718"
+VERSION="3.0.1"
+VERSION_DATE="20220721"
 
 ## izOpen is very useful when used with KeePassX or any Desktop/Browser Password Manager as secure URI launcher
 ## written by Ugo Viti <ugo.viti@initzero.it>
@@ -35,8 +35,10 @@ declare -A helper_name helper_cmd helper_opts helper_conf
 function env_os_linux() {
   system_commands="yad nc xdg-open ssh sshpass telnet xsel proxychains"
 
+  ## misc options
+  : ${clipboard_use:=1}
+  
   ## helper commands
-  #########################################################################
   
   # default command for SSH
   : ${helper_cmd[ssh]:="ssh"}
@@ -92,8 +94,11 @@ function env_os_linux() {
 function env_os_windows() {
   system_commands="nc ssh sshpass telnet yad"
   
+  ## misc options
+  : ${clipboard_use:=0}
+  
   ## helper commands
-  #########################################################################
+
   # default command for SSH
   : ${helper_cmd[ssh]:="ssh"}
 
@@ -204,6 +209,7 @@ helper_opts[ssh]="-o StrictHostKeyChecking=no -o CheckHostIP=no"
 #nc_opts="-z" 
 #terminal_use=0
 #tunnel_use_force=1
+#clipboard_use=0
 EOF
 }
 
@@ -276,7 +282,7 @@ function helper_ssh() {
   # if tunnel_create=1 add ssh options to create socks tunnel and compression
   [ "$tunnel_create" = 1 ] && helper_opts+=" -D $tunnel_port_create"
   
-  # password less login using sshpass
+  # password less ssh login using sshpass
   # FIXME don't use sshpass outside linux environment because this bug:
   # https://github.com/msys2/MSYS2-packages/issues/2458
   case $OSTYPE in
@@ -350,6 +356,7 @@ function helper_http() {
         helper_opts+=" --proxy-server=\"socks5://localhost:$tunnel_port_use\""
         case $OSTYPE in
           cygwin*)
+            # google chrome under windows workaround
             helper_opts+=" --user-data-dir=\"$(cygpath -w "$izopen_conf_dir/google-chrome/$tunnel_port_use")\""
             ;;
           *)
@@ -431,7 +438,7 @@ function helper_rdp() {
       ;;
     xfreerdp)
       # FIXME: this function always use the default keyboard
-      helper_opts+=" +clipboard /dynamic-resolution /size:85% /cert-tofu /cert-ignore /log-level:ERROR"
+      helper_opts+=" +clipboard +auto-reconnect /auto-reconnect-max-retries:2 +bitmap-cache +compression /gdi:hw -wallpaper /dynamic-resolution /size:85% /cert-tofu /cert-ignore /log-level:ERROR"
 
       #kbd_layout="$(setxkbmap -print | grep xkb_symbols | awk '{print $4}' | awk -F"+" '{print $2}' | awk -F":" '{print $1}')"
       #case "$kbd_layout" in
@@ -791,25 +798,25 @@ function uri_open() {
   local username="$uri_username"
   local password="$uri_password"
   # try to obtain password from clipboard
-  if [[ -z "$password" ]]; then
+  if [[ $clipboard_use -eq 1 && -z "$password" ]]; then
     case $OSTYPE in
       cygwin*|msys*)
         # windows cygwin/msys2 env use the /dev/clipboard for sharing
         local clipboard=$(cat /dev/clipboard)
-        #echo -n " " > /dev/clipboard
+        echo -n " " > /dev/clipboard
         ;;
       *)
         local clipboard=$(xsel -b)
         # remove the password from the clipboard
         # FIXME using a workaround because xsel doesn't clean the clipboard contents I use a SPACE here. of course you can't use single space passwords here :)
         echo -n " " | xsel -i -b
-        pkill xsel
         ;;
     esac
     # debug
     #echo clipboard: $clipboard
     #echo xsel: $(xsel -b)
     
+    # copy the clipboard to the password, or unset password if clipboard is empty
     [[ ! -z "$clipboard" || "$clipboard" != " " ]] && local password="$(echo $clipboard | tr -d [:cntrl:])" || unset password
   fi
   local host="$uri_host"
@@ -843,7 +850,7 @@ function uri_open() {
       [[ "$tunnel_create" = 1 || "$tunnel_use" = 1 ]] && helper_tunnel_manage "$uri"
       
       TRY=1; TRYMAX=2
-      until [ $TRY -ge $TRYMAX ]; do
+      #until [ $TRY -ge $TRYMAX ]; do
         # obtain commands to use to connect
         helper_${schema} "$uri"
               
@@ -862,10 +869,10 @@ function uri_open() {
         
         # exit or retry
         [ $RETVAL = 0 ] && TRY=$TRYMAX || let TRY+=1
-      done
+      #done
       
       # log the command output
-      [ $RETVAL != 0 ] && print_log_output
+      [ $RETVAL != 0 ] && echo "--> Exit code from command: $RETVAL" && print_log_output
       #print_log_footer
       ;;
     *)
@@ -890,13 +897,14 @@ version: $VERSION - release: $VERSION_DATE
 Usage: $_PROG [options] URI
 
 Options:
-  -h, --help             Show help options
-  -d, --debug            Enable debug (default: $debug)
-  -u, --uri              Specify the URI to open (you can also specify the URL as last argument without this option)
-  -t, --terminal         Open compatible schema using external terminal gui (default: $terminal_use)
-  -f, --force-tunnel     Force the usage request of an already estabilished ssh tunnel when opening the uri (default: $tunnel_use_force)
-  -p, --port             Use the specified socks port to connect using reverse tunnel (default: request the port to use)
-  --mkconfig             Create default config file, overwriting it if already exist (default location: $izopen_conf_file)
+  -h, --help                Show help options
+  -d, --debug               Enable debug (default: $debug)
+  -u, --uri                 Specify the URI to open (you can also specify the URL as last argument without this option)
+  -t, --terminal            Open compatible schema using external terminal gui (default: $terminal_use)
+  -f, --force-tunnel        Force the usage request of an already estabilished ssh tunnel when opening the uri (default: $tunnel_use_force)
+  -c, --clipboard-password  Force the usage of clipboard contents as default password when connectin (default: $clipboard_use)
+  -p, --port                Use the specified socks port to connect using reverse tunnel (default: request the port to use)
+  --mkconfig                Create default config file, overwriting it if already exist (default location: $izopen_conf_file)
 
 Examples:
   # general usage:
@@ -935,8 +943,8 @@ EOF
 [ $# = 0 ] && _usage && exit 1
 
 # define command short and long options
-_optionsShort="hu:dtfp:"
-_optionsLong="help,uri:,debug,terminal,force-tunnel,port,mkconfig"
+_optionsShort="hu:dtfcp:"
+_optionsLong="help,uri:,debug,terminal,force-tunnel,clipboard-password,port,mkconfig"
 
 # options may be followed by one colon to indicate they have a required argument
 if ! options=$(getopt -o $_optionsShort -l $_optionsLong -- "$@"); then
@@ -962,12 +970,13 @@ while [ $# -gt 0 ]; do
       debug="1"
       ;;
     -t|--terminal)
-      # force usage of estabilished tunnel for all uri schema
       [ $terminal_use = 1 ] && terminal_use=0 || terminal_use=1
       ;;
     -f|--force-tunnel)
-      # force usage of estabilished tunnel for all uri schema
       [ $tunnel_use_force = 1 ] && tunnel_use_force=0 || tunnel_use_force=1
+      ;;
+    -c|--clipboard-password)
+      [ $clipboard_use = 1 ] && clipboard_use=0 || clipboard_use=1
       ;;
     -p|--port)
       # specify the tunnel port to use (ssh schema excluded). it involves --force-tunnel
