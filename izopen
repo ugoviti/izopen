@@ -803,6 +803,7 @@ function uri_open() {
         # remove the password from the clipboard
         # FIXME using a workaround because xsel doesn't clean the clipboard contents I use a SPACE here. of course you can't use single space passwords here :)
         echo -n " " | xsel -i -b
+        pkill xsel
         ;;
     esac
     # debug
