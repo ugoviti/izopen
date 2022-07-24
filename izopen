@@ -242,9 +242,15 @@ function helper_terminal() {
 
   case ${helper_name[terminal]} in
     konsole)
+      ## for a usable list:
+      ## konsole --list-profile-properties | less
       #helper_opts[terminal]="-p tabtitle='(%u) %H'"
-      helper_opts[terminal]+=" -p tabtitle='$terminal_title'"
+      helper_opts[terminal]+=" -p name='$host'"
+      helper_opts[terminal]+=" -p LocalTabTitleFormat='$terminal_title'"
       helper_opts[terminal]+=" -p RemoteTabTitleFormat='$terminal_title'"
+      helper_opts[terminal]+=" -p TabColor='#aa55ff'"
+      helper_opts[terminal]+=" -p UseCustomCursorColor=true -p CustomCursorColor='orange'"
+      helper_opts[terminal]+=" --show-tabbar"
       #helper_opts[terminal]+=" --noclose"
       ;;
     mintty)
