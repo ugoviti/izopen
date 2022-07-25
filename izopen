@@ -73,7 +73,9 @@ function env_os_linux() {
 
   # default terminal app
   # define the command to use based on current desktop environment
-  if   [ "$XDG_CURRENT_DESKTOP" = "MATE" ]; then
+  if   [ ! -z "${helper_cmd[terminal]}" ]; then
+      : ${helper_name[terminal]:="${helper_cmd[terminal]}"}
+  elif [ "$XDG_CURRENT_DESKTOP" = "MATE" ]; then
       : ${helper_name[terminal]:="$(gsettings get org.mate.applications-terminal exec | tr -d \')"}
   elif [ "$XDG_CURRENT_DESKTOP" = "GNOME" ]; then
       : ${helper_name[terminal]:="$(gsettings get org.gnome.desktop.default-applications.terminal exec | tr -d \')"}
@@ -88,6 +90,7 @@ function env_os_linux() {
       #: ${helper_name[terminal]:="xterm"}
       : ${helper_name[terminal]:="konsole"}
   fi
+  
   : ${helper_cmd[terminal]:="${helper_name[terminal]}"}
 }
 
@@ -126,17 +129,6 @@ function env_os_windows() {
   : ${helper_cmd[terminal]:="mintty"}
 }
 
-# detect operating system and import the right system variables
-case "$OSTYPE" in
-  linux*)   env_os_linux ;; # running in linux env
-  solaris*) env_os_linux ;; # WIP
-  darwin*)  env_os_linux ;; # WIP
-  bsd*)     env_os_linux ;; # WIP
-  msys*)    env_os_windows ;; # running in windows env
-  cygwin*)  env_os_windows ;; # running in windows env
-  *)        env_os_linux ;; # always failback to linux env
-esac
-
 ## variables
 #########################################################################
 _PROG=$( echo ${0##*/} )     # define the command name
@@ -168,6 +160,17 @@ izopen_log_file="$izopen_conf_dir/izopen.log"
 
 # import configuration from izopen.conf if exist and override default script variables
 [ -f "${izopen_conf_file}" ] && source "${izopen_conf_file}"
+
+# detect operating system and import the right system variables
+case "$OSTYPE" in
+  linux*)   env_os_linux ;; # running in linux env
+  solaris*) env_os_linux ;; # WIP
+  darwin*)  env_os_linux ;; # WIP
+  bsd*)     env_os_linux ;; # WIP
+  msys*)    env_os_windows ;; # running in windows env
+  cygwin*)  env_os_windows ;; # running in windows env
+  *)        env_os_linux ;; # always failback to linux env
+esac
 
 # commands helper functions
 #########################################################################
