@@ -1,8 +1,8 @@
 #!/bin/bash
 NAME="izopen"
 DESCRIPTION="multi protocol bash script to auto opening given URI and auto creating ssh reverse tunnel socks proxy"
-VERSION="3.0.1"
-VERSION_DATE="20220721"
+VERSION="3.0.2"
+VERSION_DATE="20220809"
 
 ## izOpen is very useful when used with KeePassX or any Desktop/Browser Password Manager as secure URI launcher
 ## written by Ugo Viti <ugo.viti@initzero.it>
@@ -427,12 +427,13 @@ function helper_rdp() {
     host=$(echo $frmdata | awk 'BEGIN {FS="|" } { print $2 }')
     username=$(echo $frmdata | awk 'BEGIN {FS="|" } { print $3 }')
     password=$(echo $frmdata | awk 'BEGIN {FS="|" } { print $4 }')
-    # escape all special characters in password
-    password=$(echo $password | sed 's/[^a-zA-Z0-9]/\\&/g')
     security=$(echo $frmdata | awk 'BEGIN {FS="|" } { print $5 }')
     console=$(echo $frmdata | awk 'BEGIN {FS="|" } { print $6 }')
   fi
 
+  # escape all special characters in password
+  [ ! -z "$password" ] && password=$(echo $password | sed 's/[^a-zA-Z0-9]/\\&/g')
+  
   # run the connection
   case ${helper_name[rdp]} in
     rdesktop)
