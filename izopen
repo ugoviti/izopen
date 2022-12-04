@@ -1,8 +1,8 @@
 #!/bin/bash
 NAME="izopen"
 DESCRIPTION="multi protocol bash script to auto opening given URI and auto creating ssh reverse tunnel socks proxy"
-VERSION="3.0.2"
-VERSION_DATE="20220809"
+VERSION="3.0.3"
+VERSION_DATE="20221204"
 
 ## izOpen is very useful when used with KeePassX or any Desktop/Browser Password Manager as secure URI launcher
 ## written by Ugo Viti <ugo.viti@initzero.it>
@@ -431,13 +431,14 @@ function helper_rdp() {
     console=$(echo $frmdata | awk 'BEGIN {FS="|" } { print $6 }')
   fi
 
-  # escape all special characters in password
-  [ ! -z "$password" ] && password=$(echo $password | sed 's/[^a-zA-Z0-9]/\\&/g')
-  
   # run the connection
   case ${helper_name[rdp]} in
     rdesktop)
       helper_opts+=" -k it -g 1280x780"
+
+      # escape all special characters in password
+      [ ! -z "$password" ] && password=$(echo $password | sed 's/[^a-zA-Z0-9]/\\&/g')
+
       [ -n "$domain" ]   && helper_opts+=" -d '$domain'"
       [ -n "$username" ] && helper_opts+=" -u '$username'"
       [ -n "$password" ] && helper_opts+=" -p '$password'"
@@ -447,6 +448,9 @@ function helper_rdp() {
       helper_cmd+="${helper_prepend}${helper_cmd[rdp]}${helper_opts} ${host}${port}"
       ;;
     xfreerdp)
+      # escape all special characters in password
+      [ ! -z "$password" ] && password=$(echo $password | sed 's/[^a-zA-Z0-9]/\\&/g')
+
       # FIXME: this function always use the default keyboard
       helper_opts+=" +clipboard +auto-reconnect /auto-reconnect-max-retries:2 +bitmap-cache +compression /gdi:hw -wallpaper /dynamic-resolution /size:85% /cert-tofu /cert-ignore /log-level:ERROR"
 
@@ -481,7 +485,7 @@ function helper_rdp() {
       function make_remmina_conf() {
         cat <<EOF
 [remmina]
-name=$connection_name
+name=$host
 $([ $tunnel_use = 1 ] && echo -e "proxy_type=socks5\nproxy_hostname=localhost\nproxy_port=$tunnel_port_use")
 protocol=RDP
 resolution_mode=2
@@ -501,7 +505,7 @@ EOF
       
       # because this helper doesn't works via proxychains wrapper, don't use the ${helper_prepend} command
       unset helper_prepend
-      
+
       # launch the uri
       helper_cmd+="${helper_prepend}${helper_cmd[rdp]}${helper_opts} -c ${izopen_conf_remmina_host}"
       ;;
