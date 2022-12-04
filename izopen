@@ -58,9 +58,6 @@ function env_os_linux() {
   #: ${helper_cmd[rdp]:="xfreerdp"}
   : ${helper_cmd[rdp]:="remmina"}
 
-  # remmina specific, separe with a space every options
-  #: ${helper_conf[rdp]:="drive=/tmp"}
-
   # # default command for VNC
   : ${helper_cmd[vnc]:="vncviewer"}
 
@@ -186,7 +183,7 @@ helper_opts[ssh]="-o StrictHostKeyChecking=no -o CheckHostIP=no"
 
 # rdp options (remmina)
 #helper_cmd[rdp]="remmina"
-#helper_conf[rdp]="drive=/tmp"
+#helper_conf[rdp]="drive=/tmp window_maximize=0 window_width=1800 window_height=1100"
 
 # rdp options (freerdp)
 #helper_cmd[rdp]="xfreerdp"
