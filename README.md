@@ -108,10 +108,10 @@ Version=1.0
 Name=izOpen Web Browser
 Comment=Browse the Web through the specified local proxy socks port connected via SSH tunnnel
 Exec=izopen -f
-StartupNotify=true
+StartupNotify=false
 Terminal=false
 Type=Application
-Icon=proxytunnel
+Icon=applications-internet
 Categories=GTK;Network;WebBrowser;
 MimeType=text/html;x-scheme-handler/http;x-scheme-handler/https;' > ~/.local/share/applications/izopen-http.desktop
 ```
