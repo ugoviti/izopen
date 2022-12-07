@@ -174,23 +174,23 @@ esac
 #########################################################################
 function make_default_config() {
   cat <<EOF
-# terminal options
+### terminal options
 #helper_cmd[terminal]="konsole"
 #helper_opts[terminal]="--noclose"
 
-# ssh options
+### ssh options
 #helper_cmd[ssh]="ssh"
 helper_opts[ssh]="-o StrictHostKeyChecking=no -o CheckHostIP=no"
 
-# rdp options (remmina)
+### rdp options
+## remmina
 #helper_cmd[rdp]="remmina"
 #helper_conf[rdp]="drive=/tmp window_maximize=0 window_width=1600 window_height=1000"
-
-# rdp options (freerdp)
+## freerdp
 #helper_cmd[rdp]="xfreerdp"
 #helper_opts[rdp]="/drive:/tmp /kbd:0x00020409"
 
-# browser options
+### browser options
 #helper_cmd[http]="google-chrome"
 #helper_opts[http]="--proxy-bypass-list='<-loopback>'"
 
@@ -198,8 +198,14 @@ helper_opts[ssh]="-o StrictHostKeyChecking=no -o CheckHostIP=no"
 #helper_name[http]="google-chrome"
 #helper_cmd[http]:="/c/Program\ Files/Google/Chrome/Application/chrome.exe"}
 
-# others uri
+### vnc options
+## vncviewer
 #helper_cmd[vnc]="vncviewer"
+## remmina
+#helper_cmd[vnc]="remmina"
+#helper_conf[vnc]="window_maximize=0 window_width=1600 window_height=1000"
+
+## others uri
 #helper_cmd[ftp]="xdg-open"
 #helper_cmd[telnet]="telnet"
 #helper_cmd[smb]="xdg-open"
@@ -988,7 +994,10 @@ Examples:
   
   # open a rdp connection specifing username@domain and password and port:
   $ $_PROG rdp://Administrator@example.com:password@server:33189
-  
+
+  # open a vnc connection specifing password and port:
+  $ $_PROG vnc://SUPERs3cur3PWD@server:5902
+
   # open a smb file share with default file manager:
   $ $_PROG smb://Administrator:password@server
   
