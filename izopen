@@ -59,7 +59,8 @@ function env_os_linux() {
   : ${helper_cmd[rdp]:="remmina"}
 
   # # default command for VNC
-  : ${helper_cmd[vnc]:="vncviewer"}
+  #: ${helper_cmd[vnc]:="vncviewer"}
+  : ${helper_cmd[vnc]:="remmina"}
 
   # # default command for FTP
   : ${helper_cmd[ftp]:="xdg-open"}
@@ -183,7 +184,7 @@ helper_opts[ssh]="-o StrictHostKeyChecking=no -o CheckHostIP=no"
 
 # rdp options (remmina)
 #helper_cmd[rdp]="remmina"
-#helper_conf[rdp]="drive=/tmp window_maximize=0 window_width=1800 window_height=1100"
+#helper_conf[rdp]="drive=/tmp window_maximize=0 window_width=1600 window_height=1000"
 
 # rdp options (freerdp)
 #helper_cmd[rdp]="xfreerdp"
@@ -477,7 +478,7 @@ function helper_rdp() {
       izopen_conf_remmina_dir="$izopen_conf_dir/remmina"
       [ ! -e "$izopen_conf_remmina_dir" ] && mkdir -p "$izopen_conf_remmina_dir"
       connection_name="$(echo $host | sed -e 's/[^A-Za-z0-9_-]/_/g')"
-      izopen_conf_remmina_host="$izopen_conf_remmina_dir/${connection_name}.remmina"
+      izopen_conf_remmina_host="$izopen_conf_remmina_dir/${connection_name}_${schema}.remmina"
 
       function make_remmina_conf() {
         cat <<EOF
@@ -486,10 +487,10 @@ name=$host
 $([ $tunnel_use = 1 ] && echo -e "proxy_type=socks5\nproxy_hostname=localhost\nproxy_port=$tunnel_port_use")
 protocol=RDP
 resolution_mode=2
-viewmode=1
 scale=2
-ignore-tls-errors=1
+viewmode=1
 window_maximize=1
+ignore-tls-errors=1
 server=$host
 $([ ! -z "$domain" ] && echo "domain=$domain")
 $([ ! -z "$username" ] && echo "username=$username")
@@ -518,12 +519,60 @@ function helper_vnc() {
   
   # manage non mandatory cmd options
   helper_opts=" ${helper_opts[vnc]}"
-  # vnc doesn't support username and actually don't accept the password. use the gnome keyring instead for this
-  #helper_cmd="vinagre $schema://$host$([ -n $port ] && echo ":$port")"
-  [ -n $port ] && helper_opts+=":$port"
-  
-  # launch the uri
-  helper_cmd+="${helper_cmd[vnc]} ${host}${helper_opts}"
+
+
+  if [[ -z "$host" || -z "$username" || -z "$password" || "$username" = "{USERNAME}" || "$password" = "{PASSWORD}" || "$username" = "%7BUSERNAME%7D" || "$password" = "%7BPASSWORD%7D" ]]; then
+    frmdata=$(LANG=C yad --center --width=300 --title="Connect to remote computer" --focus-field=3 --align=right --form --field="Address" "$host" --field="Username" "$username" --field="Password":H "$password" | grep -v "WINDOW DECORATIONS RELOADED")
+    [ $? != 0 ] && exit 1
+    host=$(echo $frmdata | awk 'BEGIN {FS="|" } { print $1 }')
+    username=$(echo $frmdata | awk 'BEGIN {FS="|" } { print $2 }')
+    password=$(echo $frmdata | awk 'BEGIN {FS="|" } { print $3 }')
+  fi
+
+  # run the connection
+  case ${helper_name[vnc]} in
+    vncviewer)
+      # escape all special characters in password
+      [ ! -z "$password" ] && password=$(echo $password | sed 's/[^a-zA-Z0-9]/\\&/g')
+
+      # vnc doesn't support username and actually don't accept the password. use the gnome keyring instead for this
+      #helper_cmd="vinagre $schema://$host$([ -n $port ] && echo ":$port")"
+      [ -n $port ] && helper_opts+=":$port"
+
+      # launch the uri
+      helper_cmd+="${helper_prepend}${helper_cmd[vnc]} ${host}${helper_opts}"
+      ;;
+    remmina)
+      izopen_conf_remmina_dir="$izopen_conf_dir/remmina"
+      [ ! -e "$izopen_conf_remmina_dir" ] && mkdir -p "$izopen_conf_remmina_dir"
+      connection_name="$(echo $host | sed -e 's/[^A-Za-z0-9_-]/_/g')"
+      izopen_conf_remmina_host="$izopen_conf_remmina_dir/${connection_name}_${schema}.remmina"
+
+      function make_remmina_conf() {
+        cat <<EOF
+[remmina]
+name=$host
+$([ $tunnel_use = 1 ] && echo -e "proxy_type=socks5\nproxy_hostname=localhost\nproxy_port=$tunnel_port_use")
+protocol=VNC
+viewmode=1
+scale=1
+window_maximize=1
+ignore-tls-errors=1
+server=$host
+$([ ! -z "$username" ] && echo "username=$username")
+$([ ! -z "$password" ] && echo "password=$password")
+$(for remmina_conf in ${helper_conf[vnc]}; do echo -e "$remmina_conf\n";done)
+EOF
+      }
+      make_remmina_conf > "${izopen_conf_remmina_host}"
+
+      # because this helper doesn't works via proxychains wrapper, don't use the ${helper_prepend} command
+      unset helper_prepend
+
+      # launch the uri
+      helper_cmd+="${helper_prepend}${helper_cmd[vnc]}${helper_opts} -c ${izopen_conf_remmina_host}"
+      ;;
+  esac
 }
 
 function helper_sftp() {
@@ -817,10 +866,11 @@ function uri_open() {
         echo -n " " > /dev/clipboard
         ;;
       *)
-        local clipboard=$(xsel -b)
+        local clipboard=$(xsel -b &)
         # remove the password from the clipboard
         # FIXME using a workaround because xsel doesn't clean the clipboard contents I use a SPACE here. of course you can't use single space passwords here :)
         echo -n " " | xsel -i -b
+        killall xsel
         ;;
     esac
     # debug
