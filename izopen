@@ -486,6 +486,8 @@ function helper_rdp() {
       connection_name="$(echo $host | sed -e 's/[^A-Za-z0-9_-]/_/g')"
       izopen_conf_remmina_host="$izopen_conf_remmina_dir/${connection_name}_${schema}.remmina"
 
+      [ -z "$port" ] && server="$host" || server="$host:$port"
+
       function make_remmina_conf() {
         cat <<EOF
 [remmina]
@@ -497,7 +499,7 @@ scale=2
 viewmode=1
 window_maximize=1
 ignore-tls-errors=1
-server=$host
+server=$server
 $([ ! -z "$domain" ] && echo "domain=$domain")
 $([ ! -z "$username" ] && echo "username=$username")
 $([ ! -z "$password" ] && echo "password=$password")
@@ -554,6 +556,8 @@ function helper_vnc() {
       connection_name="$(echo $host | sed -e 's/[^A-Za-z0-9_-]/_/g')"
       izopen_conf_remmina_host="$izopen_conf_remmina_dir/${connection_name}_${schema}.remmina"
 
+      [ -z "$port" ] && server="$host" || server="$host:$port"
+
       function make_remmina_conf() {
         cat <<EOF
 [remmina]
@@ -564,7 +568,7 @@ viewmode=1
 scale=1
 window_maximize=1
 ignore-tls-errors=1
-server=$host
+server=$server
 $([ ! -z "$username" ] && echo "username=$username")
 $([ ! -z "$password" ] && echo "password=$password")
 $(for remmina_conf in ${helper_conf[vnc]}; do echo -e "$remmina_conf\n";done)
