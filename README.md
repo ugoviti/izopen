@@ -3,7 +3,7 @@ izOpen is a multi protocol bash script to auto opening given URI and auto creati
 izOpen was designed to be used as secure URI launcher in conjunction with any Password Manager (KeePassX, Browser Based etc...) 
 
 ## Features
-supported URI schemas: ssh, rdp, vnc, sftp, ftp, http, https, smb, cifs
+supported URI schemas: `ssh, rdp, vnc, sftp, ftp, http, https, smb, cifs`
 
 ### Linux OS Dependencies
 
@@ -13,6 +13,12 @@ Download and install the latest version of KeePassXC (https://keepassxc.org/).
 **Fedora / RHEL 8 DNF/RPM based distro integration:**  
 ```
 sudo dnf install -y proxychains-ng xdg-utils yad openssh-clients sshpass telnet nmap-ncat xsel freerdp remmina keepassxc
+```
+
+**Debian/Ubuntu based distro integration:**
+```
+sudo apt update
+sudo apt install -y proxychains-ng xdg-utils yad openssh-clients sshpass telnet nmap-ncat xsel freerdp remmina keepassxc
 ```
 
 ### Desktop Intergration
@@ -120,7 +126,31 @@ Add this desktop launcher into you Desktop Bar or Menu
 
 ## Windows OS Installation (Windows 10/11) (WORK IN PROGRESS)
 
-### Windows OS Dependencies (using cygwin system)
+You can run izopen inside Windows using the following methods:
+  - WSL - Windows Subsystem for Linux (https://learn.microsoft.com/en-us/windows/wsl/install)
+  - Cygwin (https://www.cygwin.com/)
+
+### Method 1: WSL - Windows Subsystem for Linux
+
+1. Make sure your system support Virtualization Technlogy and verify is enabled in your BIOS
+Run `Systeminfo.exe` to check
+
+2. Open PowerShell as Administrator and run:
+```
+Enable-WindowsOptionalFeature -Online -FeatureName Microsoft-Windows-Subsystem-Linux
+
+```
+Reboot the system
+
+3. Update WSL Kernel: https://wslstorestorage.blob.core.windows.net/wslblob/wsl_update_x64.msi
+
+4. Set default kernel version to: `wsl --set-default-version 2`
+
+5. Install Ubuntu on Windows from: https://apps.microsoft.com/store/detail/ubuntu-on-windows/9NBLGGH4MSV6
+
+6. Continue installing izOpen like on Linux System
+
+### Method 2: Cygwin system
 
 1. Install Chocolatey Package Manager:  
 Run:
@@ -163,9 +193,10 @@ REGEDIT4
 @="\"c:\\tools\\cygwin\\bin\\bash -l -i -c izopen \"%1\""
 ```
 
+```TESTS
 C:\tools\cygwin\bin\bash -l -i -c "izopen ssh://root@10.1.1.8 -d"
-
-c:\tools\cygwin\bin\bash.exe --login -i -c 'izopen -d ssh://root@10.1.1.8'
+C:\tools\cygwin\bin\bash.exe --login -i -c 'izopen -d ssh://root@10.1.1.8'
+```
 
 8. Continue with izopen installation
 
@@ -211,5 +242,5 @@ If you want overwrite the config file with the default options (after upgrade fo
 
 NB. by default this configuration is enabled:
 `helper_opts[ssh]="-o StrictHostKeyChecking=no -o CheckHostIP=no"`
-WARNING: it involves security concerns, but are required by sshpass for the first time to a new host.
+WARNING: it involves security concerns, but is required by sshpass when connecting for the first time to a new host.
 If you dont't want use these options enabled, disable from your user config file.
