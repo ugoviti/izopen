@@ -973,7 +973,7 @@ Options:
   -u, --uri                 Specify the URI to open (you can also specify the URL as last argument without this option)
   -t, --terminal            Open compatible schema using external terminal gui (default: $terminal_use)
   -f, --force-tunnel        Force the usage request of an already estabilished ssh tunnel when opening the uri (default: $tunnel_use_force)
-  -c, --clipboard-password  Force the usage of clipboard contents as default password when connectin (default: $clipboard_use)
+  -c, --clipboard-password  Force the usage of clipboard contents as default password when connecting (default: $clipboard_use)
   -p, --port                Use the specified socks port to connect using reverse tunnel (default: request the port to use)
   --mkconfig                Create default config file, overwriting it if already exist (default location: $izopen_conf_file)
 
@@ -1041,7 +1041,7 @@ while [ $# -gt 0 ]; do
       uri="$1"
       ;;
     -d|--debug)
-      debug="1"
+      [ $debug = 1 ] && debug=0 || debug=1
       ;;
     -t|--terminal)
       [ $terminal_use = 1 ] && terminal_use=0 || terminal_use=1
