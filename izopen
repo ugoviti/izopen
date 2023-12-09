@@ -1,8 +1,8 @@
 #!/bin/bash
 NAME="izopen"
 DESCRIPTION="multi protocol bash script to auto opening given URI and auto creating ssh reverse tunnel socks proxy"
-VERSION="3.0.4"
-VERSION_DATE="20221207"
+VERSION="3.0.5"
+VERSION_DATE="20251209"
 
 ## izOpen is very useful when used with KeePassX or any Desktop/Browser Password Manager as secure URI launcher
 ## written by Ugo Viti <ugo.viti@initzero.it>
@@ -184,8 +184,8 @@ helper_opts[ssh]="-o StrictHostKeyChecking=no -o CheckHostIP=no"
 
 ### rdp options
 ## remmina
-#helper_cmd[rdp]="remmina"
-#helper_conf[rdp]="drive=/tmp window_maximize=0 window_width=1600 window_height=1000"
+helper_cmd[rdp]="remmina"
+helper_conf[rdp]="drive=/tmp window_maximize=0 window_width=1600 window_height=1000 tls-seclevel=0 ignore-tls-errors=1"
 ## freerdp
 #helper_cmd[rdp]="xfreerdp"
 #helper_opts[rdp]="/drive:/tmp /kbd:0x00020409"
@@ -498,7 +498,6 @@ resolution_mode=2
 scale=2
 viewmode=1
 window_maximize=1
-ignore-tls-errors=1
 server=$server
 $([ ! -z "$domain" ] && echo "domain=$domain")
 $([ ! -z "$username" ] && echo "username=$username")
