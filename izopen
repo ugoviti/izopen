@@ -1,18 +1,18 @@
 #!/bin/bash
 NAME="izopen"
 DESCRIPTION="multi protocol bash script to auto opening given URI and auto creating ssh reverse tunnel socks proxy"
-VERSION="3.0.5"
-VERSION_DATE="20251209"
+VERSION="3.0.6"
+VERSION_DATE="20240502"
 
 ## izOpen is very useful when used with KeePassX or any Desktop/Browser Password Manager as secure URI launcher
-## written by Ugo Viti <ugo.viti@initzero.it>
+## written by Ugo Viti <u.viti@wearequantico.it>
 
 ## Features:
 ## supported URI schemas: ssh, rdp, vnc, sftp, ftp, http, https, smb, cifs
 
 ### Installation:
 ## simply copy this script into a user or system wide bin directory (suggestion: cp izopen ~/bin), must be into a PATH variable, and install the following system commands:
-## dnf install -y yad kdelibs3 xfreerdp proxychains-ng keepassxc
+## sudo dnf install -y proxychains-ng xdg-utils yad openssh-clients sshpass telnet nmap-ncat xsel wl-clipboard freerdp remmina keepassxc
 
 ## Custom config:
 ## you can customize internal variables modifying the '$HOME/.config/izopen/izopen.conf' file (automatically created on first run)
@@ -69,24 +69,34 @@ function env_os_linux() {
   : ${helper_cmd[smb]:="xdg-open"}
   : ${helper_cmd[cifs]:="xdg-open"}
 
+  # clipboard management
+  case "$XDG_SESSION_TYPE" in
+    wayland)
+      : ${clipboard_cmd:="wl-paste"}
+      : ${clipboard_cmd_paste:="wl-paste -n"}
+      : ${clipboard_cmd_clear:="wl-copy -o"}
+      ;;
+    *)
+      # X11 failback
+      : ${clipboard_cmd:="xsel"}
+      : ${clipboard_cmd_paste:="xsel -b"}
+      : ${clipboard_cmd_clear:="xsel -b -i"}
+      ;;
+  esac
+
   # default terminal app
   # define the command to use based on current desktop environment
-  if   [ ! -z "${helper_cmd[terminal]}" ]; then
+  if [ ! -z "${helper_cmd[terminal]}" ]; then
       : ${helper_name[terminal]:="${helper_cmd[terminal]}"}
-  elif [ "$XDG_CURRENT_DESKTOP" = "MATE" ]; then
-      : ${helper_name[terminal]:="$(gsettings get org.mate.applications-terminal exec | tr -d \')"}
-  elif [ "$XDG_CURRENT_DESKTOP" = "GNOME" ]; then
-      : ${helper_name[terminal]:="$(gsettings get org.gnome.desktop.default-applications.terminal exec | tr -d \')"}
-  elif [ "$XDG_CURRENT_DESKTOP" = "KDE" ]; then
-      #helper_cmd[terminal]:="$(kreadconfig --file kdeglobals --group General --key TerminalApplication | tr -d \')"}
-      : ${helper_name[terminal]:="konsole"}
-  elif [ "$XDG_CURRENT_DESKTOP" = "XFCE" ]; then
-      : ${helper_name[terminal]:="exo-open --launch TerminalEmulator"}
-  elif [ "$XDG_CURRENT_DESKTOP" = "Pantheon" ]; then
-      : ${helper_name[terminal]:="exo-open --launch TerminalEmulator"}
-    else
-      #: ${helper_name[terminal]:="xterm"}
-      : ${helper_name[terminal]:="konsole"}
+  else
+    case "$XDG_CURRENT_DESKTOP" in
+      KDE)      : ${helper_name[terminal]:="konsole"} ;;
+      GNOME)    : ${helper_name[terminal]:="$(gsettings get org.gnome.desktop.default-applications.terminal exec | tr -d \')"} ;;
+      MATE)     : ${helper_name[terminal]:="$(gsettings get org.mate.applications-terminal exec | tr -d \')"} ;;
+      XFCE)     : ${helper_name[terminal]:="exo-open --launch TerminalEmulator"} ;;
+      Pantheon) : ${helper_name[terminal]:="exo-open --launch TerminalEmulator"} ;;
+      *)        : ${helper_name[terminal]:="xterm"} ;;
+    esac
   fi
   
   : ${helper_cmd[terminal]:="${helper_name[terminal]}"}
@@ -127,7 +137,7 @@ function env_os_windows() {
   : ${helper_cmd[terminal]:="mintty"}
 }
 
-## variables
+## vars
 #########################################################################
 _PROG=$( echo ${0##*/} )     # define the command name
 
@@ -875,11 +885,12 @@ function uri_open() {
         echo -n " " > /dev/clipboard
         ;;
       *)
-        local clipboard=$(xsel -b &)
+        #local clipboard=$( $clipboard_cmd_paste & )
+        local clipboard="$($clipboard_cmd_paste)"
         # remove the password from the clipboard
         # FIXME using a workaround because xsel doesn't clean the clipboard contents I use a SPACE here. of course you can't use single space passwords here :)
-        echo -n " " | xsel -i -b
-        killall xsel
+        echo -e -n ' ' | $clipboard_cmd_clear
+        pkill $clipboard_cmd
         ;;
     esac
     # debug
