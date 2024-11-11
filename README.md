@@ -18,7 +18,7 @@ sudo dnf install -y proxychains-ng xdg-utils yad openssh-clients sshpass telnet 
 **Debian/Ubuntu based distro integration:**
 ```
 sudo apt update
-sudo apt install -y proxychains-ng xdg-utils yad openssh-clients sshpass telnet nmap-ncat xsel wl-clipboard freerdp remmina keepassxc
+sudo apt install -y proxychains-ng xdg-utils yad openssh-client sshpass telnet nmap netcat xsel wl-clipboard freerdp2-x11 remmina keepassxc
 ```
 
 ### Desktop Intergration
