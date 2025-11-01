@@ -2,7 +2,7 @@
 NAME="izopen"
 DESCRIPTION="multi protocol bash script to auto opening given URI and auto creating ssh reverse tunnel socks proxy"
 VERSION="3.1.0"
-VERSION_DATE="20250111"
+VERSION_DATE="20251101"
 
 ## izOpen is very useful when used with KeePassX or any Desktop/Browser Password Manager as secure URI launcher
 ## written by Ugo Viti <u.viti@wearequantico.it>
@@ -1234,6 +1234,7 @@ Usage: $_PROG [options] URI
 
 Options:
   -h, --help                Show help options
+  -v, --version             Show version information
   -d, --debug               Enable debug (default: $debug)
   -u, --uri                 Specify the URI to open (you can also specify the URL as last argument without this option)
   -t, --terminal            Open compatible schema using external terminal gui (default: $terminal_use)
@@ -1282,8 +1283,8 @@ EOF
 [ $# = 0 ] && _usage && exit 1
 
 # define command short and long options
-_optionsShort="hu:dtfcp:"
-_optionsLong="help,uri:,debug,terminal,force-tunnel,clipboard-password,port,mkconfig"
+_optionsShort="hvu:dtfcp:"
+_optionsLong="help,version,uri:,debug,terminal,force-tunnel,clipboard-password,port,mkconfig"
 
 # options may be followed by one colon to indicate they have a required argument
 if ! options=$(getopt -o $_optionsShort -l $_optionsLong -- "$@"); then
@@ -1299,6 +1300,10 @@ while [ $# -gt 0 ]; do
     -h|--help)
       _usage
       exit 1
+      ;;
+    -v|--version)
+      echo "$NAME version $VERSION ($VERSION_DATE)"
+      exit 0
       ;;
     -u|--uri)
       # for options with required arguments, an additional shift is required
