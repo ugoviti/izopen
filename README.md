@@ -12,7 +12,7 @@ Download and install the latest version of KeePassXC (https://keepassxc.org/).
 
 **Fedora / RHEL 8 DNF/RPM based distro integration:**  
 ```
-sudo dnf install -y proxychains-ng xdg-utils yad openssh-clients sshpass telnet nmap-ncat xsel wl-clipboard freerdp remmina keepassxc
+sudo dnf install -y proxychains-ng xdg-utils yad openssh-clients sshpass telnet nmap-ncat xsel wl-clipboard freerdp remmina keepassxc krdc
 ```
 
 **Debian/Ubuntu based distro integration:**
