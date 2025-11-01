@@ -4,28 +4,108 @@ DESCRIPTION="multi protocol bash script to auto opening given URI and auto creat
 VERSION="3.1.0"
 VERSION_DATE="20251101"
 
-## izOpen is very useful when used with KeePassX or any Desktop/Browser Password Manager as secure URI launcher
-## written by Ugo Viti <u.viti@wearequantico.it>
+################################################################################
+# izOpen - Multi-Protocol URI Launcher with SSH Tunnel Support
+# written by Ugo Viti <u.viti@wearequantico.it>
+#
+# izOpen is a versatile URI launcher designed for password managers like
+# KeePassXC, with automatic SSH reverse tunnel SOCKS proxy management.
+################################################################################
 
-## Features:
-## supported URI schemas: ssh, rdp, vnc, sftp, ftp, http, https, smb, cifs
+## FEATURES:
+# - Supported URI schemas: ssh, rdp, vnc, sftp, ftp, http, https, smb, cifs
+# - Automatic SSH reverse tunnel (SOCKS proxy) creation and management
+# - Per-host tunnel port persistence
+# - Clipboard password integration (X11 + Wayland support)
+# - Multiple RDP clients: rdesktop, xfreerdp 3.x, remmina, krdc
+# - Multiple VNC clients: vncviewer, remmina, krdc
+# - Multiple dialog tools: zenity, kdialog, yad (auto-detected)
+# - Terminal emulator auto-detection (KDE, GNOME, MATE, XFCE)
+# - Domain parsing for RDP (supports DOMAIN/user and user@DOMAIN)
+# - Automatic Remmina config generation
+# - URL encoding for krdc passwords (special characters support)
+# - Proxychains4 integration for tunnel connections
 
-### Installation:
-## simply copy this script into a user or system wide bin directory (suggestion: cp izopen ~/bin), must be into a PATH variable, and install the following system commands:
-## sudo dnf install -y proxychains-ng xdg-utils yad zenity kdialog openssh-clients sshpass telnet nmap-ncat xsel wl-clipboard freerdp remmina keepassxc krdc
+## INSTALLATION:
+# Copy this script to a directory in your PATH:
+#   cp izopen ~/bin   # or /usr/local/bin for system-wide
+#
+# Install dependencies (Fedora/RHEL):
+#   sudo dnf install -y proxychains-ng xdg-utils yad zenity kdialog \
+#     openssh-clients sshpass telnet nmap-ncat xsel wl-clipboard \
+#     freerdp remmina keepassxc krdc tigervnc
+#
+# For other distributions, install equivalent packages.
 
-## Custom config:
-## you can customize internal variables modifying the '$HOME/.config/izopen/izopen.conf' file (automatically created on first run)
+## CONFIGURATION:
+# User config: $HOME/.config/izopen/izopen.conf (auto-created on first run)
+# Override any default by setting variables in config file:
+#   helper_cmd[rdp]="xfreerdp"    # Choose RDP client
+#   helper_cmd[vnc]="krdc"        # Choose VNC client
+#   tunnel_port_min=3000          # Set tunnel port range
+#   clipboard_use=0               # Disable clipboard integration
 
-### NOTE:
-## KeePassX 0.x integration:
-##        into advanded settings of keepassx select "Custom Browser Command" and insert:
-##        izopen %1
-##        for every account stored into your database, write into URI field: schema://{USERNAME}:{PASSWORD}@address:port
-##        example: rdp://{USERNAME}:{PASSWORD}@www.example.com:3389
+## PASSWORD ESCAPING NOTES:
+# - xfreerdp 3.x: NO escaping needed (bash arrays handle special chars)
+# - rdesktop: NO escaping needed
+# - krdc: REQUIRES URL encoding (% → %25, ! → %21, @ → %40, etc.)
+# - vncviewer: NO escaping needed
 
-## KeePassX 2.x integration (Fedora >= 23):
-##        dnf install -y yad kdelibs3 proxychains-ng keepassx
+## KEEPASSX/KEEPASSXC INTEGRATION:
+# In KeePassXC settings, set "Custom Browser Command":
+#   izopen %1
+#
+# In database entries, use URI field with placeholders:
+#   rdp://{USERNAME}:{PASSWORD}@server.example.com:3389
+#   rdp://DOMAIN/{USERNAME}:{PASSWORD}@server:3389
+#   vnc://{PASSWORD}@server:5902
+#   ssh://{USERNAME}:{PASSWORD}@server:22
+#
+# Placeholders {USERNAME} and {PASSWORD} are automatically replaced.
+
+## DESKTOP INTEGRATION (MIME handler):
+# See README.md for registering izopen as default handler for:
+#   ssh://, rdp://, vnc:// URIs system-wide
+
+################################################################################
+# SECURITY CONSIDERATIONS - READ CAREFULLY
+################################################################################
+#
+# ⚠️  This script handles passwords and has inherent security risks:
+#
+# 1. SSHPASS ENVIRONMENT VARIABLE (helper_ssh)
+#    - Password exported as SSHPASS (visible in /proc/<pid>/environ)
+#    - Cleaned after execution, but window of exposure exists
+#    - Alternative: Use SSH keys + ssh-agent instead
+#
+# 2. StrictHostKeyChecking=no (DEFAULT - Line 248)
+#    - 🔴 CRITICAL: Vulnerable to Man-in-the-Middle attacks
+#    - Automatically accepts unknown SSH host keys
+#    - Override in config: helper_opts[ssh]="-o StrictHostKeyChecking=ask"
+#    - ONLY use on trusted networks
+#
+# 3. REMMINA CONFIG FILES
+#    - Passwords saved in plaintext: ~/.cache/izopen/izopen.remmina
+#    - Files should have 600 permissions (user read/write only)
+#    - Temporary but persistent until next connection
+#
+# 4. PASSWORD LOGGING
+#    - Passwords ARE sanitized from logs (sanitize_uri_for_logging)
+#    - Log file: ~/.config/izopen/izopen.log (should be 600 permissions)
+#
+# 5. CLIPBOARD HANDLING
+#    - Passwords read from clipboard (other processes may see)
+#    - Clipboard cleared after read (workaround method)
+#    - Brief window of exposure
+#
+# RECOMMENDATIONS:
+# - Use SSH keys instead of passwords when possible
+# - Enable StrictHostKeyChecking in trusted environments
+# - Run on trusted systems only (not shared computers)
+# - Review ~/.config/izopen/izopen.log permissions
+# - Consider this tool for convenience vs high-security environments
+#
+################################################################################
 
 # Declare helper variables as associative arrays
 declare -A helper_name helper_cmd helper_opts helper_conf
@@ -35,6 +115,12 @@ declare -a izopen_connect=()
 
 ## mandatory system commands based on operating system
 #########################################################################
+
+# Configure environment for Linux/Unix systems
+# Sets default helper commands for each protocol (ssh, rdp, vnc, http, etc.)
+# Configures clipboard commands based on session type (Wayland vs X11)
+# Auto-detects terminal emulator based on desktop environment (KDE, GNOME, MATE, XFCE)
+# All settings can be overridden in user config file
 function env_os_linux() {
   system_commands="nc xdg-open ssh sshpass telnet proxychains"
 
@@ -105,6 +191,10 @@ function env_os_linux() {
   : ${helper_cmd[terminal]:="${helper_name[terminal]}"}
 }
 
+# Configure environment for Windows (Cygwin/MSYS2) systems
+# Sets default helper commands optimized for Windows environment
+# Disables clipboard_use by default (clipboard integration issues on Windows)
+# Uses Windows-specific paths for Chrome and sets mintty as default terminal
 function env_os_windows() {
   system_commands="nc ssh sshpass telnet yad"
 
@@ -165,10 +255,17 @@ izopen_conf_proxychains_conf="$izopen_cache_dir/proxychains.conf"
 # make dirs if not exist
 [ ! -e "$izopen_conf_dir" ] && mkdir -p "$izopen_conf_dir"
 [ ! -e "$izopen_conf_hosts_dir" ] && mkdir -p "$izopen_conf_hosts_dir"
-#[ ! -e "$izopen_conf_proxychains_dir" ] && mkdir -p "$izopen_conf_proxychains_dir"
+[ ! -e "$izopen_cache_dir" ] && mkdir -p "$izopen_cache_dir"
 
-# izopen log file
+# ensure secure permissions on directories (always, even if they already exist)
+chmod 700 "$izopen_conf_dir" 2>/dev/null
+chmod 700 "$izopen_conf_hosts_dir" 2>/dev/null
+chmod 700 "$izopen_cache_dir" 2>/dev/null
+
+# izopen log file - create if doesn't exist and ensure secure permissions
 izopen_log_file="$izopen_conf_dir/izopen.log"
+[ ! -e "$izopen_log_file" ] && touch "$izopen_log_file"
+chmod 600 "$izopen_log_file" 2>/dev/null
 
 # import configuration from izopen.conf if exist and override default script variables
 [ -f "${izopen_conf_file}" ] && source "${izopen_conf_file}"
@@ -266,6 +363,112 @@ function check_helper_cmd() {
   [ $? -ne 0 ] && echo "WARNING: the command '$@' doesn't exist in any path, please install it and retry"
 }
 
+#########################################################################
+# SHARED HELPER INFRASTRUCTURE
+# Common functions used by all protocol helpers to reduce code duplication
+#########################################################################
+
+# Initialize helper connection for any protocol
+# Sets helper name, checks command exists, resets connection array
+# Usage: init_helper_connection "protocol_name"
+function init_helper_connection() {
+  local protocol="$1"
+
+  # Set helper name if not defined
+  [ -z "${helper_name[$protocol]}" ] && helper_name[$protocol]="${helper_cmd[$protocol]}"
+
+  # Verify command exists
+  check_helper_cmd "${helper_cmd[$protocol]}"
+
+  # Reset connection array
+  izopen_connect=()
+}
+
+# Add protocol-specific options to connection array
+# Parses helper_opts[protocol] and adds to izopen_connect array
+# Usage: add_helper_opts "protocol_name"
+function add_helper_opts() {
+  local protocol="$1"
+
+  if [ -n "${helper_opts[$protocol]}" ]; then
+    local -a opts_array
+    read -ra opts_array <<< "${helper_opts[$protocol]}"
+    izopen_connect+=("${opts_array[@]}")
+  fi
+}
+
+# Wrap command with terminal emulator if terminal_use=1
+# Prepends terminal command and options to izopen_connect array
+# Usage: wrap_with_terminal (call after building izopen_connect)
+function wrap_with_terminal() {
+  [ "$terminal_use" != 1 ] && return
+
+  # Build terminal command
+  helper_terminal
+
+  local -a terminal_cmd=("${helper_cmd[terminal]}")
+
+  # Add terminal options if any
+  if [ ${#terminal_opts_array[@]} -gt 0 ]; then
+    terminal_cmd+=("${terminal_opts_array[@]}")
+  fi
+
+  # Add execute flag
+  terminal_cmd+=("-e")
+
+  # Prepend terminal wrapper to connection command
+  izopen_connect=("${terminal_cmd[@]}" "${izopen_connect[@]}")
+}
+
+# Generate unified Remmina configuration file
+# Supports both RDP and VNC protocols with protocol-specific settings
+# Usage: generate_remmina_config "protocol" "server" "config_file_path"
+# Variables used: $host, $tunnel_use, $tunnel_port_use, $username, $password, $domain (RDP only)
+function generate_remmina_config() {
+  local protocol="$1"
+  local server="$2"
+  local conf_file="$3"
+
+  # Protocol-specific settings
+  local protocol_upper="${protocol^^}"  # Convert to uppercase (RDP, VNC)
+  local extra_settings=""
+
+  case "$protocol" in
+    rdp)
+      extra_settings="resolution_mode=2
+scale=2"
+      ;;
+    vnc)
+      extra_settings="scale=1
+ignore-tls-errors=1"
+      ;;
+  esac
+
+  # Generate config
+  cat > "$conf_file" <<EOF
+[remmina]
+name=$host
+#$([ $tunnel_use = 1 ] && echo -e "proxy_type=socks5\nproxy_hostname=127.0.0.1\nproxy_port=$tunnel_port_use")
+protocol=$protocol_upper
+viewmode=1
+window_maximize=1
+$extra_settings
+server=$server
+$([ ! -z "$domain" ] && [ "$protocol" = "rdp" ] && echo "domain=$domain")
+$([ ! -z "$username" ] && echo "username=$username")
+$([ ! -z "$password" ] && echo "password=$password")
+$(for conf in ${helper_conf[$protocol]}; do echo -e "$conf\n";done)
+EOF
+
+  # Set secure permissions (password is stored in plaintext)
+  chmod 600 "$conf_file"
+}
+
+# Configure terminal emulator options for wrapping commands
+# Sets terminal-specific options (title, colors, profile properties)
+# Distinguishes between MASTER (tunnel creator) and SLAVE (tunnel user) sessions
+# Populates terminal_opts_array with terminal-specific flags
+# Supports: konsole (KDE), mintty (Windows), generic terminals
 function helper_terminal() {
   # if helper_name[$schema] is not defined, use the helper_cmd[$schema] instead
   [ -z "${helper_name[terminal]}" ] && helper_name[terminal]="${helper_cmd[terminal]}"
@@ -467,25 +670,8 @@ function dialog_text_info() {
 }
 
 function helper_ssh() {
-  # if helper_name[$schema] is not defined, use the helper_cmd[$schema] instead
-  [ -z "${helper_name[ssh]}" ] && helper_name[ssh]="${helper_cmd[ssh]}"
-
-  # verify if the command exist
-  check_helper_cmd "${helper_cmd[ssh]}"
-
-  # reset array
-  izopen_connect=()
-
-  # open external terminal app if required
-  if [ "$terminal_use" = 1 ]; then
-    helper_terminal
-    izopen_connect+=("${helper_cmd[terminal]}")
-    # add terminal options as separate array elements
-    if [ ${#terminal_opts_array[@]} -gt 0 ]; then
-      izopen_connect+=("${terminal_opts_array[@]}")
-    fi
-    izopen_connect+=("-e")
-  fi
+  # Initialize connection (sets helper name, checks command, resets array)
+  init_helper_connection "ssh"
 
   # password less ssh login using sshpass
   # FIXME don't use sshpass outside linux environment because this bug:
@@ -505,11 +691,8 @@ function helper_ssh() {
   # add ssh command
   izopen_connect+=("${helper_cmd[ssh]}")
 
-  # add ssh options as separate array elements
-  if [ -n "${helper_opts[ssh]}" ]; then
-    read -ra ssh_opts_array <<< "${helper_opts[ssh]}"
-    izopen_connect+=("${ssh_opts_array[@]}")
-  fi
+  # add ssh options
+  add_helper_opts "ssh"
 
   # add username and host
   if [ ! -z "$username" ]; then
@@ -524,66 +707,42 @@ function helper_ssh() {
   # enable compression
   izopen_connect+=(-C)
 
+  # wrap with terminal if required (must be last)
+  wrap_with_terminal
+
   # if tunnel_create=1 add ssh options to create socks tunnel
   [ "$tunnel_create" = 1 ] && izopen_connect+=(-D "$tunnel_port_create")
 }
 
 function helper_telnet() {
-  # if helper_name[$schema] is not defined, use the helper_cmd[$schema] instead
-  [ -z "${helper_name[telnet]}" ] && helper_name[telnet]="${helper_cmd[telnet]}"
-
-  # verify if the command exist
-  check_helper_cmd "${helper_cmd[telnet]}"
-
-  # reset array
-  izopen_connect=()
-
-  # open external terminal app if required
-  if [ "$terminal_use" = 1 ]; then
-    helper_terminal
-    izopen_connect+=("${helper_cmd[terminal]}")
-    if [ ${#terminal_opts_array[@]} -gt 0 ]; then
-      izopen_connect+=("${terminal_opts_array[@]}")
-    fi
-    izopen_connect+=("-e")
-  fi
+  # Initialize connection
+  init_helper_connection "telnet"
 
   # add telnet command
   izopen_connect+=("${helper_cmd[telnet]}")
 
-  # add telnet options as separate array elements
-  if [ -n "${helper_opts[telnet]}" ]; then
-    read -ra telnet_opts_array <<< "${helper_opts[telnet]}"
-    izopen_connect+=("${telnet_opts_array[@]}")
-  fi
+  # add telnet options
+  add_helper_opts "telnet"
 
   # add host
   izopen_connect+=("$host")
 
   # add port if specified
   [ -n "$port" ] && izopen_connect+=("$port")
+
+  # wrap with terminal if required (must be last)
+  wrap_with_terminal
 }
 
 function helper_http() {
-  # if helper_name[$schema] is not defined, use the helper_cmd[$schema] instead
-  [ -z "${helper_name[http]}" ] && helper_name[http]="${helper_cmd[http]}"
-
-  # verify if the command exist
-  check_helper_cmd "${helper_cmd[http]}"
-
-  # reset array
-  izopen_connect=()
+  # Initialize connection
+  init_helper_connection "http"
 
   # run the connection
   case ${helper_name[http]} in
     google-chrome)
       izopen_connect+=("${helper_cmd[http]}")
-
-      # add base options as separate array elements
-      if [ -n "${helper_opts[http]}" ]; then
-        read -ra http_opts_array <<< "${helper_opts[http]}"
-        izopen_connect+=("${http_opts_array[@]}")
-      fi
+      add_helper_opts "http"
 
       # open the browser with this options only on tunnel connection
       if [ $tunnel_use = 1 ]; then
@@ -614,22 +773,13 @@ function helper_http() {
       ;;
     midori)
       izopen_connect+=("${helper_cmd[http]}")
-
-      if [ -n "${helper_opts[http]}" ]; then
-        read -ra http_opts_array <<< "${helper_opts[http]}"
-        izopen_connect+=("${http_opts_array[@]}")
-      fi
-
+      add_helper_opts "http"
       izopen_connect+=(-c "$izopen_conf_dir/midori/$tunnel_port_use")
       ;;
     *)
       helper_cmd[http]="xdg-open"
       izopen_connect+=("${helper_cmd[http]}")
-
-      if [ -n "${helper_opts[http]}" ]; then
-        read -ra http_opts_array <<< "${helper_opts[http]}"
-        izopen_connect+=("${http_opts_array[@]}")
-      fi
+      add_helper_opts "http"
       ;;
   esac
 
@@ -637,326 +787,265 @@ function helper_http() {
   izopen_connect+=("${uri}")
 }
 
+#########################################################################
+# RDP HELPER FUNCTIONS
+# Split helper_rdp into specialized functions for better maintainability
+#########################################################################
+
+# Parse RDP domain from username
+# Supports both DOMAIN/username and username@DOMAIN formats
+# Modifies global variables: $domain, $username
+function parse_rdp_domain() {
+  # Using / or \ as domain separator, domain is the first part
+  if [[ "$username" == *"/"* ]]; then
+    domain="${username%%/*}"
+    username="${username#*/}"
+  fi
+
+  # Using @ as domain separator, domain is the second part
+  if [[ "$username" == *"@"* ]]; then
+    domain="${username##*@}"
+    username="${username%%@*}"
+  fi
+}
+
+# Validate RDP credentials and show dialog if incomplete
+# Checks for empty or placeholder values in host, username, password
+# Shows dialog form if credentials are incomplete
+# Modifies global variables: $domain, $host, $username, $password, $security, $console
+function validate_rdp_credentials() {
+  if [[ -z "$host" || -z "$username" || -z "$password" || \
+        "$username" == "{USERNAME}" || "$password" == "{PASSWORD}" || \
+        "$username" == "%7BUSERNAME%7D" || "$password" == "%7BPASSWORD%7D" ]]; then
+
+    local frmdata=$(dialog_form_rdp "$domain" "$host" "$username" "$password")
+    [ $? != 0 ] && exit 1
+
+    domain=$(echo "$frmdata" | awk 'BEGIN {FS="|"} {print $1}')
+    host=$(echo "$frmdata" | awk 'BEGIN {FS="|"} {print $2}')
+    username=$(echo "$frmdata" | awk 'BEGIN {FS="|"} {print $3}')
+    password=$(echo "$frmdata" | awk 'BEGIN {FS="|"} {print $4}')
+    security=$(echo "$frmdata" | awk 'BEGIN {FS="|"} {print $5}')
+    console=$(echo "$frmdata" | awk 'BEGIN {FS="|"} {print $6}')
+  fi
+}
+
+# Helper function for rdesktop RDP client
+function helper_rdp_rdesktop() {
+  init_helper_connection "rdp"
+
+  izopen_connect+=("${helper_cmd[rdp]}")
+  add_helper_opts "rdp"
+
+  # NOTE: rdesktop does not need password escaping with bash arrays
+  [ -n "$domain" ]   && izopen_connect+=(-d "$domain")
+  [ -n "$username" ] && izopen_connect+=(-u "$username")
+  [ -n "$password" ] && izopen_connect+=(-p "$password")
+
+  # Add host with optional port
+  local port_suffix=""
+  [ -n "$port" ] && port_suffix=":$port"
+  izopen_connect+=("${host}${port_suffix}")
+}
+
+# Helper function for xfreerdp 3.x RDP client
+function helper_rdp_xfreerdp() {
+  init_helper_connection "rdp"
+
+  izopen_connect+=("${helper_cmd[rdp]}")
+  add_helper_opts "rdp"
+
+  # NOTE: xfreerdp 3.x does not need password escaping when using bash arrays
+  # The password is passed correctly as-is. Escaping causes authentication to fail.
+
+  # xfreerdp >= 3.x default options
+  izopen_connect+=(+clipboard +auto-reconnect /auto-reconnect-max-retries:2 /cache:bitmap:on +compression /gdi:hw -wallpaper /dynamic-resolution /size:85% /cert:ignore /log-level:ERROR)
+
+  [ -n "$domain" ]   && izopen_connect+=(/d:"$domain")
+  [ -n "$username" ] && izopen_connect+=(/u:"$username")
+
+  if [ -n "$password" ]; then
+    izopen_connect+=(/p:"$password")
+  else
+    izopen_connect+=(/p:'')
+  fi
+
+  [ -n "$port" ]              && izopen_connect+=(/port:"$port")
+  [ -n "$security" ]          && izopen_connect+=(/sec:"$security")
+  [ "$console" = "TRUE" ]     && izopen_connect+=(/console)
+
+  izopen_connect+=(/v:"${host}")
+}
+
+# Helper function for Remmina RDP client
+function helper_rdp_remmina() {
+  # Remove legacy files
+  [ -e "$izopen_conf_dir/remmina" ] && rm -f "$izopen_conf_dir"/remmina/*.remmina && rmdir "$izopen_conf_dir/remmina"
+
+  # Create remmina config file
+  local izopen_conf_remmina_conf="$izopen_cache_dir/izopen.remmina"
+  local server
+  [ -z "$port" ] && server="$host" || server="$host:$port"
+
+  # Generate config using unified function
+  generate_remmina_config "rdp" "$server" "$izopen_conf_remmina_conf"
+
+  init_helper_connection "rdp"
+  izopen_connect+=("${helper_cmd[rdp]}")
+  add_helper_opts "rdp"
+  izopen_connect+=(-c "${izopen_conf_remmina_conf}")
+}
+
+# Helper function for krdc RDP client
+function helper_rdp_krdc() {
+  init_helper_connection "rdp"
+
+  izopen_connect+=("${helper_cmd[rdp]}")
+  add_helper_opts "rdp"
+
+  # Build RDP URL for krdc: rdp://[DOMAIN\username[:password]@]host[:port]
+  local rdp_url="rdp://"
+
+  if [ -n "$username" ]; then
+    # Add domain prefix if present (DOMAIN\username format)
+    [ -n "$domain" ] && rdp_url+="${domain}\\${username}" || rdp_url+="${username}"
+
+    # Add password with URL encoding if present
+    if [ -n "$password" ]; then
+      # NOTE: krdc REQUIRES URL encoding for special characters (unlike xfreerdp 3.x)
+      # Without encoding, passwords with %, !, @, etc. will fail authentication
+      local password_encoded=$(printf %s "$password" | sed 's/%/%25/g; s/ /%20/g; s/!/%21/g; s/"/%22/g; s/#/%23/g; s/\$/%24/g; s/&/%26/g; s/'\''/%27/g; s/(/%28/g; s/)/%29/g; s/\*/%2A/g; s/+/%2B/g; s/,/%2C/g; s/:/%3A/g; s/;/%3B/g; s/=/%3D/g; s/?/%3F/g; s/@/%40/g; s/\[/%5B/g; s/\\/%5C/g; s/\]/%5D/g')
+      rdp_url+=":${password_encoded}"
+    fi
+
+    rdp_url+="@"
+  fi
+
+  rdp_url+="${host}"
+  [ -n "$port" ] && rdp_url+=":${port}"
+
+  izopen_connect+=("${rdp_url}")
+}
+
 function helper_rdp() {
-  # if helper_name[$schema] is not defined, use the helper_cmd[$schema] instead
+  # Set helper name if not defined
   [ -z "${helper_name[rdp]}" ] && helper_name[rdp]="${helper_cmd[rdp]}"
 
-  # verify if the command exist
+  # Verify command exists
   check_helper_cmd "${helper_cmd[rdp]}"
 
-  # manage non mandatory cmd options
-  helper_opts=" ${helper_opts[rdp]}"
+  # Parse domain from username (supports DOMAIN/user and user@DOMAIN)
+  parse_rdp_domain
 
-  # obtain general info used by all rdp commands
-  ## extract windows domain from username and convert to the right name
-  # using / or \ as domain separator the domain is the first argument
-  if [ ! -z $(echo "$username" | grep "/") ]; then
-    domain="$(echo "$username" | awk -F"/" '{print $1}')"
-    username="$(echo "$username" | awk -F"/" '{print $2}')"
-  fi
-  # using @ as domain separator the domain is the second argument
-  if [ ! -z $(echo "$username" | grep "@") ]; then
-    domain="$(echo "$username" | awk -F"@" '{print $2}')"
-    username="$(echo "$username" | awk -F"@" '{print $1}')"
-  fi
+  # Validate credentials and show dialog if incomplete
+  validate_rdp_credentials
 
-  # FIXME: @20220714 still needed? commenting
-  #password="$(echo -e -n "$password" | sed 's/\%25/\%/g' | sed -e 's/%\([A-Z]\)/%\L\1/')" # keepassxc bug workaround: after the '%' char, keepassxc convert to uppercase the following char
-
-  # special characters in password like ',!
-  #password="$(echo -e -n "$password" | sed -e "s/'/\\\'/g" -e "s/!/\\\!/g")"
-
-  #[ -z "$username" ] && username=$domain && unset domain
-  #username="$(echo "$username" | sed 's/\//\\\\/g')"
-
-  if [[ -z "$host" || -z "$username" || -z "$password" || "$username" = "{USERNAME}" || "$password" = "{PASSWORD}" || "$username" = "%7BUSERNAME%7D" || "$password" = "%7BPASSWORD%7D" ]]; then
-    frmdata=$(dialog_form_rdp "$domain" "$host" "$username" "$password")
-    [ $? != 0 ] && exit 1
-    domain=$(echo $frmdata | awk 'BEGIN {FS="|" } { print $1 }')
-    host=$(echo $frmdata | awk 'BEGIN {FS="|" } { print $2 }')
-    username=$(echo $frmdata | awk 'BEGIN {FS="|" } { print $3 }')
-    password=$(echo $frmdata | awk 'BEGIN {FS="|" } { print $4 }')
-    security=$(echo $frmdata | awk 'BEGIN {FS="|" } { print $5 }')
-    console=$(echo $frmdata | awk 'BEGIN {FS="|" } { print $6 }')
-  fi
-
-  # run the connection
+  # Dispatch to client-specific function
   case ${helper_name[rdp]} in
-    rdesktop)
-      # reset array
-      izopen_connect=()
-
-      # add command
-      izopen_connect+=("${helper_cmd[rdp]}")
-
-      # add base options as separate array elements
-      if [ -n "${helper_opts[rdp]}" ]; then
-        read -ra rdp_opts_array <<< "${helper_opts[rdp]}"
-        izopen_connect+=("${rdp_opts_array[@]}")
-      fi
-
-      # escape all special characters in password
-      #[ ! -z "$password" ] && password=$(echo $password | sed 's/[^a-zA-Z0-9]/\\&/g')
-
-      [ -n "$domain" ]   && izopen_connect+=(-d "$domain")
-      [ -n "$username" ] && izopen_connect+=(-u "$username")
-      [ -n "$password" ] && izopen_connect+=(-p "$password")
-      [ -n "$port" ]     && local port_suffix=":$port" || local port_suffix=""
-
-      # add host with optional port
-      izopen_connect+=("${host}${port_suffix}")
-      ;;
-    xfreerdp)
-      # reset array
-      izopen_connect=()
-
-      # add command
-      izopen_connect+=("${helper_cmd[rdp]}")
-
-      # add base options as separate array elements
-      if [ -n "${helper_opts[rdp]}" ]; then
-        read -ra rdp_opts_array <<< "${helper_opts[rdp]}"
-        izopen_connect+=("${rdp_opts_array[@]}")
-      fi
-
-      # NOTE: xfreerdp 3.x does not need password escaping when using bash arrays with quoted arguments
-      # The password is passed correctly as-is. Escaping special chars causes authentication to fail.
-      # [ ! -z "$password" ] && password=$(echo $password | sed 's/[^a-zA-Z0-9]/\\&/g')
-
-      # xfreerdp > 3.x default options
-      izopen_connect+=(+clipboard +auto-reconnect /auto-reconnect-max-retries:2 /cache:bitmap:on +compression /gdi:hw -wallpaper /dynamic-resolution /size:85% /cert:ignore /log-level:ERROR)
-
-      [ ! -z "$domain" ]   && izopen_connect+=(/d:"$domain")
-      [ ! -z "$username" ] && izopen_connect+=(/u:"$username")
-      if [ ! -z "$password" ]; then
-        izopen_connect+=(/p:"$password")
-      else
-        izopen_connect+=(/p:'')
-      fi
-      [ ! -z "$port" ]     && izopen_connect+=(/port:"$port")
-      [ ! -z "$security" ] && izopen_connect+=(/sec:"$security")
-      [ "$console" = "TRUE" ] && izopen_connect+=(/console)
-
-      # add server
-      izopen_connect+=(/v:"${host}")
-      ;;
-    remmina)
-      # izopen_conf_remmina_dir="$izopen_conf_dir/remmina"
-      # [ ! -e "$izopen_conf_remmina_dir" ] && mkdir -p "$izopen_conf_remmina_dir"
-      # connection_name="$(echo $host | sed -e 's/[^A-Za-z0-9_-]/_/g')"
-      # izopen_conf_remmina_conf="$izopen_conf_remmina_dir/${connection_name}_${schema}.remmina"
-
-      # remove legacy files
-      [ -e "$izopen_conf_dir/remmina" ] && rm -f $izopen_conf_dir/remmina/*.remmina && rmdir $izopen_conf_dir/remmina
-
-      # create remmina config file
-      izopen_conf_remmina_conf="$izopen_cache_dir/izopen.remmina"
-
-      [ -z "$port" ] && server="$host" || server="$host:$port"
-
-      function make_remmina_conf() {
-        cat <<EOF
-[remmina]
-name=$host
-#$([ $tunnel_use = 1 ] && echo -e "proxy_type=socks5\nproxy_hostname=127.0.0.1\nproxy_port=$tunnel_port_use")
-protocol=RDP
-resolution_mode=2
-scale=2
-viewmode=1
-window_maximize=1
-server=$server
-$([ ! -z "$domain" ] && echo "domain=$domain")
-$([ ! -z "$username" ] && echo "username=$username")
-$([ ! -z "$password" ] && echo "password=$password")
-$(for remmina_conf in ${helper_conf[rdp]}; do echo -e "$remmina_conf\n";done)
-EOF
-      }
-
-      make_remmina_conf > "${izopen_conf_remmina_conf}"
-
-      # reset array
-      izopen_connect=()
-
-      # add command
-      izopen_connect+=("${helper_cmd[rdp]}")
-
-      # add base options as separate array elements
-      if [ -n "${helper_opts[rdp]}" ]; then
-        read -ra rdp_opts_array <<< "${helper_opts[rdp]}"
-        izopen_connect+=("${rdp_opts_array[@]}")
-      fi
-
-      izopen_connect+=(-c "${izopen_conf_remmina_conf}")
-      ;;
-    krdc)
-      # reset array
-      izopen_connect=()
-
-      # add command
-      izopen_connect+=("${helper_cmd[rdp]}")
-
-      # add base options as separate array elements
-      if [ -n "${helper_opts[rdp]}" ]; then
-        read -ra rdp_opts_array <<< "${helper_opts[rdp]}"
-        izopen_connect+=("${rdp_opts_array[@]}")
-      fi
-
-      # Build RDP URL for krdc
-      # Format: rdp://[DOMAIN\username[:password]@]host[:port]
-      local rdp_url="rdp://"
-
-      # Add credentials if present
-      if [ ! -z "$username" ]; then
-        # Add domain prefix if present (DOMAIN\username format for krdc)
-        if [ ! -z "$domain" ]; then
-          rdp_url+="${domain}\\${username}"
-        else
-          rdp_url+="${username}"
-        fi
-
-        # Add password if present
-        if [ ! -z "$password" ]; then
-          # NOTE: krdc REQUIRES URL encoding for special characters in passwords (unlike xfreerdp 3.x)
-          # Without encoding, passwords with %, !, @, etc. will fail authentication
-          local password_encoded=$(printf %s "$password" | sed 's/%/%25/g; s/ /%20/g; s/!/%21/g; s/"/%22/g; s/#/%23/g; s/\$/%24/g; s/&/%26/g; s/'\''/%27/g; s/(/%28/g; s/)/%29/g; s/\*/%2A/g; s/+/%2B/g; s/,/%2C/g; s/:/%3A/g; s/;/%3B/g; s/=/%3D/g; s/?/%3F/g; s/@/%40/g; s/\[/%5B/g; s/\\/%5C/g; s/\]/%5D/g')
-          rdp_url+=":${password_encoded}"
-        fi
-
-        rdp_url+="@"
-      fi
-
-      # Add host
-      rdp_url+="${host}"
-
-      # Add port if specified
-      if [ ! -z "$port" ]; then
-        rdp_url+=":${port}"
-      fi
-
-      izopen_connect+=("${rdp_url}")
-      ;;
+    rdesktop) helper_rdp_rdesktop ;;
+    xfreerdp) helper_rdp_xfreerdp ;;
+    remmina)  helper_rdp_remmina ;;
+    krdc)     helper_rdp_krdc ;;
   esac
 }
 
+#########################################################################
+# VNC HELPER FUNCTIONS
+# Split helper_vnc into specialized functions for better maintainability
+#########################################################################
+
+# Validate VNC credentials and show dialog if incomplete
+# Checks for empty or placeholder values in host, username, password
+# Shows dialog form if credentials are incomplete
+# Modifies global variables: $host, $username, $password
+function validate_vnc_credentials() {
+  if [[ -z "$host" || -z "$username" || -z "$password" || \
+        "$username" == "{USERNAME}" || "$password" == "{PASSWORD}" || \
+        "$username" == "%7BUSERNAME%7D" || "$password" == "%7BPASSWORD%7D" ]]; then
+
+    local frmdata=$(dialog_form_vnc "$host" "$username" "$password")
+    [ $? != 0 ] && exit 1
+
+    host=$(echo "$frmdata" | awk 'BEGIN {FS="|"} {print $1}')
+    username=$(echo "$frmdata" | awk 'BEGIN {FS="|"} {print $2}')
+    password=$(echo "$frmdata" | awk 'BEGIN {FS="|"} {print $3}')
+  fi
+}
+
+# Helper function for vncviewer client
+function helper_vnc_vncviewer() {
+  init_helper_connection "vnc"
+
+  izopen_connect+=("${helper_cmd[vnc]}")
+  add_helper_opts "vnc"
+
+  # NOTE: vncviewer does not need password escaping with bash arrays
+  # VNC doesn't support username and typically uses keyring for password
+
+  # Add host with optional port
+  if [ -n "$port" ]; then
+    izopen_connect+=("${host}:${port}")
+  else
+    izopen_connect+=("${host}")
+  fi
+}
+
+# Helper function for Remmina VNC client
+function helper_vnc_remmina() {
+  # Remove legacy files
+  [ -e "$izopen_conf_dir/remmina" ] && rm -f "$izopen_conf_dir"/remmina/*.remmina && rmdir "$izopen_conf_dir/remmina"
+
+  # Create remmina config file
+  local izopen_conf_remmina_conf="$izopen_cache_dir/izopen.remmina"
+  local server
+  [ -z "$port" ] && server="$host" || server="$host:$port"
+
+  # Generate config using unified function
+  generate_remmina_config "vnc" "$server" "$izopen_conf_remmina_conf"
+
+  init_helper_connection "vnc"
+  izopen_connect+=("${helper_cmd[vnc]}")
+  add_helper_opts "vnc"
+  izopen_connect+=(-c "${izopen_conf_remmina_conf}")
+}
+
+# Helper function for krdc VNC client
+function helper_vnc_krdc() {
+  init_helper_connection "vnc"
+
+  izopen_connect+=("${helper_cmd[vnc]}")
+  add_helper_opts "vnc"
+
+  # Build VNC URL for krdc: vnc://[password@]host[:port]
+  local vnc_url="vnc://"
+
+  # Add password if present (VNC typically doesn't use username)
+  [ -n "$password" ] && vnc_url+="${password}@"
+
+  # Add host
+  vnc_url+="${host}"
+
+  # Add port if specified
+  [ -n "$port" ] && vnc_url+=":${port}"
+
+  izopen_connect+=("${vnc_url}")
+}
+
 function helper_vnc() {
-  # if helper_name[$schema] is not defined, use the helper_cmd[$schema] instead
+  # Set helper name if not defined
   [ -z "${helper_name[vnc]}" ] && helper_name[vnc]="${helper_cmd[vnc]}"
 
-  # verify if the command exist
+  # Verify command exists
   check_helper_cmd "${helper_cmd[vnc]}"
 
+  # Validate credentials and show dialog if incomplete
+  validate_vnc_credentials
 
-  if [[ -z "$host" || -z "$username" || -z "$password" || "$username" = "{USERNAME}" || "$password" = "{PASSWORD}" || "$username" = "%7BUSERNAME%7D" || "$password" = "%7BPASSWORD%7D" ]]; then
-    frmdata=$(dialog_form_vnc "$host" "$username" "$password")
-    [ $? != 0 ] && exit 1
-    host=$(echo $frmdata | awk 'BEGIN {FS="|" } { print $1 }')
-    username=$(echo $frmdata | awk 'BEGIN {FS="|" } { print $2 }')
-    password=$(echo $frmdata | awk 'BEGIN {FS="|" } { print $3 }')
-  fi
-
-  # run the connection
+  # Dispatch to client-specific function
   case ${helper_name[vnc]} in
-    vncviewer)
-      # reset array
-      izopen_connect=()
-
-      # add command
-      izopen_connect+=("${helper_cmd[vnc]}")
-
-      # add base options as separate array elements
-      if [ -n "${helper_opts[vnc]}" ]; then
-        read -ra vnc_opts_array <<< "${helper_opts[vnc]}"
-        izopen_connect+=("${vnc_opts_array[@]}")
-      fi
-
-      # escape all special characters in password
-      #[ ! -z "$password" ] && password=$(echo $password | sed 's/[^a-zA-Z0-9]/\\&/g')
-
-      # vnc doesn't support username and actually don't accept the password. use the gnome keyring instead for this
-      if [ -n "$port" ]; then
-        izopen_connect+=("${host}:${port}")
-      else
-        izopen_connect+=("${host}")
-      fi
-      ;;
-    remmina)
-      # izopen_conf_remmina_dir="$izopen_conf_dir/remmina"
-      # [ ! -e "$izopen_conf_remmina_dir" ] && mkdir -p "$izopen_conf_remmina_dir"
-      # connection_name="$(echo $host | sed -e 's/[^A-Za-z0-9_-]/_/g')"
-      # izopen_conf_remmina_conf="$izopen_conf_remmina_dir/${connection_name}_${schema}.remmina"
-
-      # remove legacy files
-      [ -e "$izopen_conf_dir/remmina" ] && rm -f $izopen_conf_dir/remmina/*.remmina && rmdir $izopen_conf_dir/remmina
-
-      # create remmina config file
-      izopen_conf_remmina_conf="$izopen_cache_dir/izopen.remmina"
-
-      [ -z "$port" ] && server="$host" || server="$host:$port"
-
-      function make_remmina_conf() {
-        cat <<EOF
-[remmina]
-name=$host
-$([ $tunnel_use = 1 ] && echo -e "proxy_type=socks5\nproxy_hostname=localhost\nproxy_port=$tunnel_port_use")
-protocol=VNC
-viewmode=1
-scale=1
-window_maximize=1
-ignore-tls-errors=1
-server=$server
-$([ ! -z "$username" ] && echo "username=$username")
-$([ ! -z "$password" ] && echo "password=$password")
-$(for remmina_conf in ${helper_conf[vnc]}; do echo -e "$remmina_conf\n";done)
-EOF
-      }
-      make_remmina_conf > "${izopen_conf_remmina_conf}"
-
-      # reset array
-      izopen_connect=()
-
-      # add command
-      izopen_connect+=("${helper_cmd[vnc]}")
-
-      # add base options as separate array elements
-      if [ -n "${helper_opts[vnc]}" ]; then
-        read -ra vnc_opts_array <<< "${helper_opts[vnc]}"
-        izopen_connect+=("${vnc_opts_array[@]}")
-      fi
-
-      izopen_connect+=(-c "${izopen_conf_remmina_conf}")
-      ;;
-    krdc)
-      # reset array
-      izopen_connect=()
-
-      # add command
-      izopen_connect+=("${helper_cmd[vnc]}")
-
-      # add base options as separate array elements
-      if [ -n "${helper_opts[vnc]}" ]; then
-        read -ra vnc_opts_array <<< "${helper_opts[vnc]}"
-        izopen_connect+=("${vnc_opts_array[@]}")
-      fi
-
-      # Build VNC URL for krdc
-      # Format: vnc://[password@]host[:port]
-      local vnc_url="vnc://"
-
-      # Add password if present (VNC typically doesn't use username)
-      if [ ! -z "$password" ]; then
-        vnc_url+="${password}@"
-      fi
-
-      # Add host
-      vnc_url+="${host}"
-
-      # Add port if specified
-      if [ ! -z "$port" ]; then
-        vnc_url+=":${port}"
-      fi
-
-      izopen_connect+=("${vnc_url}")
-      ;;
+    vncviewer) helper_vnc_vncviewer ;;
+    remmina)   helper_vnc_remmina ;;
+    krdc)      helper_vnc_krdc ;;
   esac
 }
 
@@ -966,65 +1055,42 @@ function helper_sftp() {
 }
 
 function helper_ftp() {
-  check_helper_cmd "${helper_cmd[ftp]}"
-
-  # reset array
-  izopen_connect=()
+  # Initialize connection
+  init_helper_connection "ftp"
 
   # add command
   izopen_connect+=("${helper_cmd[ftp]}")
 
-  # add base options as separate array elements
-  if [ -n "${helper_opts[ftp]}" ]; then
-    read -ra ftp_opts_array <<< "${helper_opts[ftp]}"
-    izopen_connect+=("${ftp_opts_array[@]}")
-  fi
+  # add base options
+  add_helper_opts "ftp"
 
   # add URI
   izopen_connect+=("${uri}")
 }
 
-function helper_https() {
-  helper_http "$uri"
-}
-
-function helper_about() {
-  helper_http "$uri"
-}
-
 function helper_smb() {
-  check_helper_cmd "${helper_cmd[smb]}"
-
-  # reset array
-  izopen_connect=()
+  # Initialize connection
+  init_helper_connection "smb"
 
   # add command
   izopen_connect+=("${helper_cmd[smb]}")
 
-  # add base options as separate array elements
-  if [ -n "${helper_opts[smb]}" ]; then
-    read -ra smb_opts_array <<< "${helper_opts[smb]}"
-    izopen_connect+=("${smb_opts_array[@]}")
-  fi
+  # add base options
+  add_helper_opts "smb"
 
   # add URI
   izopen_connect+=("${uri}")
 }
 
 function helper_cifs() {
-  check_helper_cmd "${helper_cmd[cifs]}"
-
-  # reset array
-  izopen_connect=()
+  # Initialize connection
+  init_helper_connection "cifs"
 
   # add command
   izopen_connect+=("${helper_cmd[cifs]}")
 
-  # add base options as separate array elements
-  if [ -n "${helper_opts[cifs]}" ]; then
-    read -ra cifs_opts_array <<< "${helper_opts[cifs]}"
-    izopen_connect+=("${cifs_opts_array[@]}")
-  fi
+  # add base options
+  add_helper_opts "cifs"
 
   # add URI
   izopen_connect+=("${uri}")
@@ -1034,7 +1100,12 @@ function helper_cifs() {
 # DON'T TOUCH ANYTHING BELLOW
 #########################################################################
 
-# create tunnel
+# Generate proxychains4 configuration for SOCKS5 tunnel
+# Creates config with strict chain, proxy DNS, and custom timeouts
+# Usage: make_proxychains_conf <port>
+# Parameters:
+#   $1 - SOCKS5 port number to use for tunnel
+# Note: remote_dns_subnet=224, tcp_read_time_out=15000ms, tcp_connect_time_out=8000ms
 function make_proxychains_conf() {
   cat <<EOF
 strict_chain
@@ -1049,9 +1120,15 @@ socks5 127.0.0.1 $1
 EOF
 }
 
-## find duplicated ports
-# find "/home/jin/.config/izopen/hosts" -maxdepth 1 -type f -name '*.conf' -exec awk '{print FILENAME ":" $0}' {} + | grep -E ':[0-9]+$' | sort -t: -k2,2n | awk -F: '{c[$2]++; f[$2]=f[$2]?f[$2]", "$1:$1} END{for(p in c) if(c[p]>1) print "Porta "p" duplicata in: "f[p]}' | sort -n -k2
-
+# Find available port in specified range
+# Scans existing port config files and finds first gap or next port after last used
+# Usage: find_available_port <dir> [min_port] [max_port] [mode]
+# Parameters:
+#   $1 - Directory containing *.conf files with port numbers
+#   $2 - Minimum port number (default: 1024)
+#   $3 - Maximum port number (default: 65535)
+#   $4 - Mode: "first" (find first gap) or "last" (next after last used)
+# Algorithm: Reads all ports from .conf files, finds first gap in sequence, or returns prev+1
 function find_available_port() {
   local dir="$1"
   local min_port="${2:-1024}"
@@ -1126,6 +1203,11 @@ function helper_tunnel_use() {
   [ ! -z "$tunnel_port_use" ] && echo $tunnel_port_use > "$izopen_conf_tunnel_port_current"
 }
 
+# Manage SSH tunnel creation and usage based on schema and flags
+# Orchestrates tunnel creation for ssh:// schemas and tunnel usage for other schemas
+# Sets up proxychains4 configuration if tunnel is used
+# Validates tunnel port is within allowed range (tunnel_port_min to tunnel_port_max)
+# Uses global variables: $schema, $tunnel_use, $tunnel_use_force, $tunnel_port_use
 function helper_tunnel_manage() {
   # verify if needed to create the ssh tunnel only if the uri is ssh://
   case ${schema} in
@@ -1191,7 +1273,7 @@ function print_log_debug() {
         helper_opts: ${helper_opts[$schema]}
         helper_conf: ${helper_conf[$schema]}
      helper_prepend: ${helper_prepend}
-                cmd: ${izopen_connect[@]}
+                cmd: $(printf '%q ' "${izopen_connect[@]}")
 EOF
   echo "----------------------------------------------------------------------------------------"
 }
@@ -1213,21 +1295,32 @@ function uri_parser() {
     uri="${uri//\`/%60}"
     uri="${uri//\"/%22}"
 
-    # top level parsing
+    # Top level URI parsing with regex
+    # Pattern breakdown (13 capture groups):
+    # (1) (2)        Full schema    -> (([a-z]{3,6}):\/\/)?
+    # (3)            Full address   -> ((([^:]+)(:([^@\/]*))?@)?([^:\/?]+)(:([0-9]+))?)
+    #    (4)         User+pass      -> (([^:]+)(:([^@\/]*))?@)?
+    #       (5)      Username       -> ([^:]+)
+    #       (6)(7)   Password       -> (:([^@\/]*))?
+    #    (8)         Host           -> ([^:\/?]+)
+    #    (9)(10)     Port           -> (:([0-9]+))?
+    # (11)           Path           -> (\/[^?]*)?
+    # (12)           Query          -> (\?[^#]*)?
+    # (13)           Fragment       -> (#.*)?
     pattern='^(([a-z]{3,6}):\/\/)?((([^:]+)(:([^@\/]*))?@)?([^:\/?]+)(:([0-9]+))?)(\/[^?]*)?(\?[^#]*)?(#.*)?$'
     [[ "$uri" =~ $pattern ]] || return 1;
 
-    # component extraction
-    uri=${BASH_REMATCH[0]}
-    uri_schema=${BASH_REMATCH[2]}
-    uri_address=${BASH_REMATCH[3]}
-    uri_username=${BASH_REMATCH[5]}
-    uri_password=${BASH_REMATCH[7]}
-    uri_host=${BASH_REMATCH[8]}
-    uri_port=${BASH_REMATCH[10]}
-    uri_path=${BASH_REMATCH[11]}
-    uri_query=${BASH_REMATCH[12]}
-    uri_fragment=${BASH_REMATCH[13]}
+    # Component extraction from BASH_REMATCH array
+    uri=${BASH_REMATCH[0]}          # Full matched URI
+    uri_schema=${BASH_REMATCH[2]}   # Protocol (ssh, rdp, vnc, http, etc.)
+    uri_address=${BASH_REMATCH[3]}  # Full address part (user:pass@host:port)
+    uri_username=${BASH_REMATCH[5]} # Username
+    uri_password=${BASH_REMATCH[7]} # Password
+    uri_host=${BASH_REMATCH[8]}     # Hostname or IP
+    uri_port=${BASH_REMATCH[10]}    # Port number
+    uri_path=${BASH_REMATCH[11]}    # Path (/path/to/resource)
+    uri_query=${BASH_REMATCH[12]}   # Query string (?arg1=val1&arg2=val2)
+    uri_fragment=${BASH_REMATCH[13]} # Fragment (#anchor)
 
     # path parsing
     count=0
@@ -1273,7 +1366,63 @@ function confirm () {
     esac
 }
 
+#########################################################################
+# URI HELPER FUNCTIONS
+# Extract clipboard and sanitization logic for better maintainability
+#########################################################################
 
+# Get password from clipboard if clipboard_use=1 and password is empty
+# Clears clipboard after reading for security
+# Returns password via stdout
+function get_password_from_clipboard() {
+  [ $clipboard_use -ne 1 ] && return 1
+
+  local clipboard
+
+  case $OSTYPE in
+    cygwin*|msys*)
+      # Windows cygwin/msys2 env use /dev/clipboard for sharing
+      clipboard=$(cat /dev/clipboard)
+      echo -n " " > /dev/clipboard
+      ;;
+    *)
+      clipboard="$($clipboard_cmd_paste)"
+      # Remove password from clipboard
+      # FIXME: Using workaround because xsel doesn't clean the clipboard - using SPACE
+      # Note: single space passwords won't work with this workaround
+      echo -e -n ' ' | $clipboard_cmd_clear
+      ;;
+  esac
+
+  # Return clipboard contents if not empty or space
+  if [[ -n "$clipboard" && "$clipboard" != " " ]]; then
+    echo "$clipboard" | tr -d [:cntrl:]
+  fi
+}
+
+# Sanitize URI for logging by removing password
+# Uses sed to replace password in URI with empty string
+# Returns sanitized URI via stdout
+# Usage: sanitize_uri_for_logging "uri" "password"
+function sanitize_uri_for_logging() {
+  local uri="$1"
+  local password="$2"
+
+  if [ -z "$password" ]; then
+    echo "$uri"
+  else
+    # Escape password for sed regex, then remove it from URI
+    local escaped_password=$(printf '%s\n' "$password" | sed 's/[^a-zA-Z0-9]/\\&/g')
+    echo "$uri" | sed "s/:${escaped_password}//g"
+  fi
+}
+
+# Open URI by dispatching to appropriate protocol helper
+# Main function that orchestrates URI parsing, password handling, tunnel management, and execution
+# Supports: ssh, telnet, rdp, vnc, sftp, ftp, http, https, smb, cifs
+# Handles password extraction from clipboard if not in URI
+# Creates sanitized URI for safe logging (removes password)
+# Manages SSH tunnel creation/usage based on schema and tunnel flags
 function uri_open() {
   local uri="$1"
   shift
@@ -1284,35 +1433,19 @@ function uri_open() {
   local schema="$uri_schema"
   local username="$uri_username"
   local password="$uri_password"
-  # try to obtain password from clipboard
-  if [[ $clipboard_use -eq 1 && -z "$password" ]]; then
-    case $OSTYPE in
-      cygwin*|msys*)
-        # windows cygwin/msys2 env use the /dev/clipboard for sharing
-        local clipboard=$(cat /dev/clipboard)
-        echo -n " " > /dev/clipboard
-        ;;
-      *)
-        #local clipboard=$( $clipboard_cmd_paste & )
-        local clipboard="$($clipboard_cmd_paste)"
-        # remove the password from the clipboard
-        # FIXME using a workaround because xsel doesn't clean the clipboard contents I use a SPACE here. of course you can't use single space passwords here :)
-        echo -e -n ' ' | $clipboard_cmd_clear
-        #pkill $clipboard_cmd
-        ;;
-    esac
-    # debug
-    #echo clipboard: $clipboard
-    #echo xsel: $(xsel -b)
 
-    # copy the clipboard to the password, or unset password if clipboard is empty
-    [[ ! -z "$clipboard" || "$clipboard" != " " ]] && local password="$(echo $clipboard | tr -d [:cntrl:])" || unset password
+  # Try to obtain password from clipboard if not in URI
+  if [ -z "$password" ]; then
+    local clipboard_password=$(get_password_from_clipboard)
+    [ -n "$clipboard_password" ] && password="$clipboard_password"
   fi
+
   local host="$uri_host"
   local port="$uri_port"
   local path="$uri_path"
-  # for safety logging create a new uri variable without the password
-  [ -z "$password" ] && local uri_safe="$uri" || local uri_safe="$(echo "$uri" | sed "s/:$(echo "$password" | sed 's/[^a-zA-Z0-9]/\\&/g')//g")"
+
+  # Create sanitized URI for safe logging (removes password)
+  local uri_safe=$(sanitize_uri_for_logging "$uri" "$password")
 
 
   uri_unset
@@ -1323,9 +1456,12 @@ function uri_open() {
   # WORKAROUND: Use an already estabilished ssh tunnel and open default http handler defining schema as http
   [[ $tunnel_use -eq 1 && -z "$uri" ]] && schema=http
 
+  # Map https and about to http (they use the same handler)
+  [[ "$schema" == "https" || "$schema" == "about" ]] && schema="http"
+
   ## customize the following uri for command associations:
   case $schema in
-    ssh|telnet|rdp|vnc|sftp|ftp|http|https|about|smb|cifs|file)
+    ssh|telnet|rdp|vnc|sftp|ftp|http|smb|cifs|file)
       # create or use ssh tunnel if required
       case $schema in
         ssh)
@@ -1339,39 +1475,28 @@ function uri_open() {
       # manage the use or creation of ssh tunnel
       [[ "$tunnel_create" = 1 || "$tunnel_use" = 1 ]] && helper_tunnel_manage "$uri"
 
-      TRY=1; TRYMAX=2
-      #until [ $TRY -ge $TRYMAX ]; do
-        # obtain commands to use to connect
-        helper_${schema} "$uri"
+      # obtain commands to use to connect
+      helper_${schema} "$uri"
 
-        # prepend proxychains or other commands if helper_prepend is set
-        if [ ! -z "$helper_prepend" ] && [ "$helper_prepend_skip" != "1" ]; then
-          # convert helper_prepend string to array and prepend to izopen_connect
-          read -ra prepend_array <<< "$helper_prepend"
-          izopen_connect=("${prepend_array[@]}" "${izopen_connect[@]}")
-        fi
+      # prepend proxychains or other commands if helper_prepend is set
+      if [ ! -z "$helper_prepend" ] && [ "$helper_prepend_skip" != "1" ]; then
+        # convert helper_prepend string to array and prepend to izopen_connect
+        read -ra prepend_array <<< "$helper_prepend"
+        izopen_connect=("${prepend_array[@]}" "${izopen_connect[@]}")
+      fi
 
-        # log the command execution
-        print_log_header
+      # log the command execution
+      print_log_header
 
-        # make the connection to the remote server
-        #echo "${izopen_connect[@]}"
-        "${izopen_connect[@]}"
-        RETVAL=$?
+      # make the connection to the remote server
+      "${izopen_connect[@]}"
+      RETVAL=$?
 
-        # debug
-        #echo TRY:[$TRY/$TRYMAX] RETVAL:[$RETVAL]
+      # for safety reasons unset the password after execution
+      unset password
 
-        # for safety reasons unset the password after first try
-        unset password
-
-        # exit or retry
-        [ $RETVAL = 0 ] && TRY=$TRYMAX || let TRY+=1
-      #done
-
-      # log the command output
+      # log the command output if there was an error
       [ $RETVAL != 0 ] && echo "--> Exit code from command: $RETVAL" && print_log_output
-      #print_log_footer
       ;;
     *)
       echo "ERROR: invalid URI specified: $uri"
@@ -1523,5 +1648,5 @@ detect_dialog_tool
 
 uri_open "$uri" 2>&1 | tee -a "${izopen_log_file}"
 
-# be sure to unset all dangerous variables
-trap "unset password SSHPASS" 0
+# be sure to unset all dangerous variables on exit, error, or normal termination
+trap "unset password SSHPASS" EXIT ERR
