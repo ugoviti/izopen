@@ -1514,7 +1514,7 @@ function _usage()  {
   _PROG=$( echo ${0##*/} )
   cat <<EOF
 $NAME - $DESCRIPTION
-written by Ugo Viti <ugo.viti@initzero.it>
+written by Ugo Viti <u.viti@wearequantico.it>
 version: $VERSION - release: $VERSION_DATE
 
 Usage: $_PROG [options] URI
