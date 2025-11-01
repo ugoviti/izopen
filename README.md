@@ -46,13 +46,13 @@ izOpen is a bash script designed to seamlessly open URIs with automatic SSH tunn
 
 **Fedora / RHEL / CentOS (DNF/RPM):**
 ```bash
-sudo dnf install -y proxychains-ng xdg-utils yad openssh-clients sshpass telnet nmap-ncat xsel wl-clipboard freerdp remmina keepassxc krdc
+sudo dnf install -y proxychains-ng xdg-utils yad zenity kdialog openssh-clients sshpass telnet nmap-ncat xsel wl-clipboard freerdp remmina keepassxc krdc
 ```
 
 **Debian / Ubuntu (APT):**
 ```bash
 sudo apt update
-sudo apt install -y proxychains-ng xdg-utils yad openssh-client sshpass telnet nmap netcat xsel wl-clipboard freerdp2-x11 remmina keepassxc krdc
+sudo apt install -y proxychains-ng xdg-utils yad zenity kdialog openssh-client sshpass telnet nmap netcat xsel wl-clipboard freerdp2-x11 remmina keepassxc krdc
 ```
 
 ### Optional Dependencies

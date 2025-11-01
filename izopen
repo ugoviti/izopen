@@ -12,7 +12,7 @@ VERSION_DATE="20251101"
 
 ### Installation:
 ## simply copy this script into a user or system wide bin directory (suggestion: cp izopen ~/bin), must be into a PATH variable, and install the following system commands:
-## sudo dnf install -y proxychains-ng xdg-utils yad openssh-clients sshpass telnet nmap-ncat xsel wl-clipboard freerdp remmina keepassxc krdc
+## sudo dnf install -y proxychains-ng xdg-utils yad zenity kdialog openssh-clients sshpass telnet nmap-ncat xsel wl-clipboard freerdp remmina keepassxc krdc
 
 ## Custom config:
 ## you can customize internal variables modifying the '$HOME/.config/izopen/izopen.conf' file (automatically created on first run)
@@ -36,7 +36,7 @@ declare -a izopen_connect=()
 ## mandatory system commands based on operating system
 #########################################################################
 function env_os_linux() {
-  system_commands="yad nc xdg-open ssh sshpass telnet xsel proxychains"
+  system_commands="nc xdg-open ssh sshpass telnet proxychains"
 
   ## misc options
   : ${clipboard_use:=1}
@@ -279,25 +279,189 @@ function helper_terminal() {
      local terminal_title="H:$host P:$tunnel_port_create [SLAVE]"
   fi
 
+  # Initialize terminal options array
+  terminal_opts_array=()
+
+  # Parse any pre-configured options from config file
+  if [ -n "${helper_opts[terminal]}" ]; then
+    read -ra terminal_opts_array <<< "${helper_opts[terminal]}"
+  fi
+
+  # Add terminal-specific options directly to array
   case ${helper_name[terminal]} in
     konsole)
       ## for a usable list:
       ## konsole --list-profile-properties | less
-      #helper_opts[terminal]="-p tabtitle='(%u) %H'"
-      helper_opts[terminal]+=" -p name='$host'"
-      helper_opts[terminal]+=" -p LocalTabTitleFormat='$terminal_title'"
-      helper_opts[terminal]+=" -p RemoteTabTitleFormat='$terminal_title'"
-      helper_opts[terminal]+=" -p TabColor='#aa55ff'"
-      helper_opts[terminal]+=" -p UseCustomCursorColor=true -p CustomCursorColor='orange'"
-      helper_opts[terminal]+=" --show-tabbar"
-      #helper_opts[terminal]+=" --noclose"
+      #terminal_opts_array+=(-p "tabtitle=(%u) %H")
+      terminal_opts_array+=(-p "name=$host")
+      terminal_opts_array+=(-p "LocalTabTitleFormat=$terminal_title")
+      terminal_opts_array+=(-p "RemoteTabTitleFormat=$terminal_title")
+      terminal_opts_array+=(-p "TabColor=#aa55ff")
+      terminal_opts_array+=(-p "UseCustomCursorColor=true")
+      terminal_opts_array+=(-p "CustomCursorColor=orange")
+      terminal_opts_array+=(--show-tabbar)
+      #terminal_opts_array+=(--noclose)
       ;;
     mintty)
-      helper_opts[terminal]+=" -T \"$terminal_title\""
+      terminal_opts_array+=(-T "$terminal_title")
       ;;
     *)
       #echo helper_name[terminal]: ${helper_name[terminal]}
-      helper_opts[terminal]+=" --title=\"$terminal_title\""
+      terminal_opts_array+=(--title="$terminal_title")
+      ;;
+  esac
+}
+
+#########################################################################
+# DIALOG FUNCTIONS - Support for zenity, kdialog and yad
+#########################################################################
+
+# Detect desktop environment and select appropriate dialog tool
+function detect_dialog_tool() {
+  # Check if running on KDE Plasma
+  if [[ "$XDG_CURRENT_DESKTOP" == *"KDE"* ]] || [[ "$DESKTOP_SESSION" == *"plasma"* ]]; then
+    #dialog_tool="kdialog"
+    dialog_tool="zenity"
+  else
+    # Default to zenity for all other desktop environments, fallback to yad
+    if command -v zenity &> /dev/null; then
+      dialog_tool="zenity"
+    else
+      dialog_tool="yad"
+    fi
+  fi
+}
+
+# RDP connection form dialog
+function dialog_form_rdp() {
+  local domain="$1"
+  local host="$2"
+  local username="$3"
+  local password="$4"
+
+  case "$dialog_tool" in
+    kdialog)
+      # kdialog: use multiple sequential input boxes
+      local d=$(kdialog --inputbox "Domain:" "$domain" 2>/dev/null)
+      [ $? -ne 0 ] && return 1
+      local h=$(kdialog --inputbox "Address:" "$host" 2>/dev/null)
+      [ $? -ne 0 ] && return 1
+      local u=$(kdialog --inputbox "Username:" "$username" 2>/dev/null)
+      [ $? -ne 0 ] && return 1
+      local p=$(kdialog --password "Password:" 2>/dev/null)
+      [ $? -ne 0 ] && return 1
+      # Use default values for security (nla) and console (FALSE)
+      echo "$d|$h|$u|$p|nla|FALSE"
+      ;;
+    zenity)
+      # zenity: use forms
+      zenity --forms --title="Connect to remote computer" --width=400 \
+        --text="RDP Connection" \
+        --add-entry="Domain" \
+        --add-entry="Address" \
+        --add-entry="Username" \
+        --add-password="Password" \
+        --add-combo="Security" --combo-values="rdp|tls|nla|ext" \
+        --separator="|" 2>/dev/null
+      ;;
+    *)
+      # yad: original form with all fields
+      LANG=C yad --center --width=300 --title="Connect to remote computer" \
+        --focus-field=4 --align=right --form \
+        --field="Domain" "$domain" \
+        --field="Address" "$host" \
+        --field="Username" "$username" \
+        --field="Password":H "$password" \
+        --field="Security":CB 'rdp!tls!^nla!ext' \
+        --field="Admin Console":CHK 2>/dev/null | \
+        grep -v "WINDOW DECORATIONS RELOADED"
+      ;;
+  esac
+}
+
+# VNC connection form dialog
+function dialog_form_vnc() {
+  local host="$1"
+  local username="$2"
+  local password="$3"
+
+  case "$dialog_tool" in
+    kdialog)
+      # kdialog: use multiple sequential input boxes
+      local h=$(kdialog --inputbox "Address:" "$host" 2>/dev/null)
+      [ $? -ne 0 ] && return 1
+      local u=$(kdialog --inputbox "Username:" "$username" 2>/dev/null)
+      [ $? -ne 0 ] && return 1
+      local p=$(kdialog --password "Password:" 2>/dev/null)
+      [ $? -ne 0 ] && return 1
+      echo "$h|$u|$p"
+      ;;
+    zenity)
+      # zenity: use forms
+      zenity --forms --title="Connect to remote computer" --width=400 \
+        --text="VNC Connection" \
+        --add-entry="Address" \
+        --add-entry="Username" \
+        --add-password="Password" \
+        --separator="|" 2>/dev/null
+      ;;
+    *)
+      # yad: original form
+      LANG=C yad --center --width=300 --title="Connect to remote computer" \
+        --focus-field=3 --align=right --form \
+        --field="Address" "$host" \
+        --field="Username" "$username" \
+        --field="Password":H "$password" 2>/dev/null | \
+        grep -v "WINDOW DECORATIONS RELOADED"
+      ;;
+  esac
+}
+
+# SSH tunnel port entry dialog
+function dialog_entry_port() {
+  local default_port="$1"
+  local min="$2"
+  local max="$3"
+
+  case "$dialog_tool" in
+    kdialog)
+      kdialog --inputbox "Inserire porta SOCKS proxy ($min-$max):" "$default_port" 2>/dev/null
+      ;;
+    zenity)
+      zenity --entry --title="izOpen SSH Proxy" --width=300 \
+        --text="Inserire porta SOCKS proxy ($min-$max):" \
+        --entry-text="$default_port" 2>/dev/null
+      ;;
+    *)
+      LANG=C yad --center --title="izOpen SSH Proxy" --entry --numeric \
+        --entry-text=$default_port \
+        --text="<b>Inserire la porta del Proxy Socks</b> \nCompresa fra $min e $max\n" \
+        $min $max --timeout=10 --timeout-indicator=bottom 2>/dev/null | \
+        tr -d [:alpha:] | tr -d [:cntrl:] | tr -d [:space:]
+      ;;
+  esac
+}
+
+# Connection error log viewer dialog
+function dialog_text_info() {
+  local log_file="$1"
+  local log_content
+
+  # Extract relevant log entries
+  log_content=$(tail -n 350 "$log_file" | sed -n "H; /^$(date '+%Y-%m-%d')/h; \${g;p;}")
+
+  case "$dialog_tool" in
+    kdialog)
+      echo "$log_content" | kdialog --textbox /dev/stdin 100 40 --title "Connection Error" 2>/dev/null
+      ;;
+    zenity)
+      echo "$log_content" | zenity --text-info --title="Connection Error" --width=1000 --height=500 2>/dev/null
+      ;;
+    *)
+      echo "$log_content" | LANG=C yad --center --width=1000 --height=500 \
+        --title="Connection Error" --button="Close":0 \
+        --text="Errors from ${log_file}" \
+        --text-info --fontname="Monospace 8" 2>/dev/null
       ;;
   esac
 }
@@ -317,8 +481,7 @@ function helper_ssh() {
     helper_terminal
     izopen_connect+=("${helper_cmd[terminal]}")
     # add terminal options as separate array elements
-    if [ -n "${helper_opts[terminal]}" ]; then
-      read -ra terminal_opts_array <<< "${helper_opts[terminal]}"
+    if [ ${#terminal_opts_array[@]} -gt 0 ]; then
       izopen_connect+=("${terminal_opts_array[@]}")
     fi
     izopen_connect+=("-e")
@@ -379,8 +542,7 @@ function helper_telnet() {
   if [ "$terminal_use" = 1 ]; then
     helper_terminal
     izopen_connect+=("${helper_cmd[terminal]}")
-    if [ -n "${helper_opts[terminal]}" ]; then
-      read -ra terminal_opts_array <<< "${helper_opts[terminal]}"
+    if [ ${#terminal_opts_array[@]} -gt 0 ]; then
       izopen_connect+=("${terminal_opts_array[@]}")
     fi
     izopen_connect+=("-e")
@@ -508,7 +670,7 @@ function helper_rdp() {
   #username="$(echo "$username" | sed 's/\//\\\\/g')"
 
   if [[ -z "$host" || -z "$username" || -z "$password" || "$username" = "{USERNAME}" || "$password" = "{PASSWORD}" || "$username" = "%7BUSERNAME%7D" || "$password" = "%7BPASSWORD%7D" ]]; then
-    frmdata=$(LANG=C yad --center --width=300 --title="Connect to remote computer" --focus-field=4 --align=right --form --field="Domain" "$domain" --field="Address" "$host" --field="Username" "$username" --field="Password":H "$password" --field="Security":CB 'rdp!tls!^nla!ext' --field="Admin Console":CHK | grep -v "WINDOW DECORATIONS RELOADED")
+    frmdata=$(dialog_form_rdp "$domain" "$host" "$username" "$password")
     [ $? != 0 ] && exit 1
     domain=$(echo $frmdata | awk 'BEGIN {FS="|" } { print $1 }')
     host=$(echo $frmdata | awk 'BEGIN {FS="|" } { print $2 }')
@@ -685,7 +847,7 @@ function helper_vnc() {
 
 
   if [[ -z "$host" || -z "$username" || -z "$password" || "$username" = "{USERNAME}" || "$password" = "{PASSWORD}" || "$username" = "%7BUSERNAME%7D" || "$password" = "%7BPASSWORD%7D" ]]; then
-    frmdata=$(LANG=C yad --center --width=300 --title="Connect to remote computer" --focus-field=3 --align=right --form --field="Address" "$host" --field="Username" "$username" --field="Password":H "$password" | grep -v "WINDOW DECORATIONS RELOADED")
+    frmdata=$(dialog_form_vnc "$host" "$username" "$password")
     [ $? != 0 ] && exit 1
     host=$(echo $frmdata | awk 'BEGIN {FS="|" } { print $1 }')
     username=$(echo $frmdata | awk 'BEGIN {FS="|" } { print $2 }')
@@ -957,7 +1119,7 @@ function helper_tunnel_use() {
     tunnel_port_use="$(cat "$izopen_conf_tunnel_port_current")"
 
     # request if we must use the last used port
-    tunnel_port_use=$(LANG=C yad --center --title="izOpen SSH Proxy" --entry --numeric --entry-text=$tunnel_port_use --text="<b>Inserire la porta del Proxy Socks</b> \nCompresa fra $tunnel_port_min e $tunnel_port_max\n" $tunnel_port_min $tunnel_port_max --timeout=10 --timeout-indicator=bottom | tr -d [:alpha:] | tr -d [:cntrl:] | tr -d [:space:])
+    tunnel_port_use=$(dialog_entry_port "$tunnel_port_use" "$tunnel_port_min" "$tunnel_port_max")
   fi
 
   # save the last used port for later usage
@@ -1004,7 +1166,7 @@ function print_log_header() {
 }
 
 function print_log_output() {
-  tail -n 350 "${izopen_log_file}" | sed -n "H; /^$(date '+%Y-%m-%d')/h; \${g;p;}" | LANG=C yad --center --width=1000 --height=500 --title="Connection Error" --button="Close":0 --text "Errors from ${izopen_log_file}" --text-info --fontname="Monospace 8"
+  dialog_text_info "${izopen_log_file}"
 }
 
 function print_log_footer() {
@@ -1355,6 +1517,9 @@ done
 
 # check if all required system command are installed
 check_system_commands $system_commands
+
+# detect the appropriate dialog tool based on desktop environment
+detect_dialog_tool
 
 uri_open "$uri" 2>&1 | tee -a "${izopen_log_file}"
 
