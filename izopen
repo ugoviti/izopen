@@ -1,8 +1,8 @@
 #!/bin/bash
 NAME="izopen"
 DESCRIPTION="multi protocol bash script to auto opening given URI and auto creating ssh reverse tunnel socks proxy"
-VERSION="3.0.6"
-VERSION_DATE="20240502"
+VERSION="3.0.7"
+VERSION_DATE="20250111"
 
 ## izOpen is very useful when used with KeePassX or any Desktop/Browser Password Manager as secure URI launcher
 ## written by Ugo Viti <u.viti@wearequantico.it>
@@ -147,21 +147,22 @@ _PROG=$( echo ${0##*/} )     # define the command name
 : ${tunnel_use:=1}           # use the existing ssh tunnel
 : ${tunnel_use_force:=0}     # always use the tunnel for every opened uri (also for ssh it self)
 : ${tunnel_port_min:=2000}   # minimun tunnel port number to use
-: ${tunnel_port_max:=4999}   # maximun tunnel port number to use
+: ${tunnel_port_max:=65535}  # maximun tunnel port number to use
 
 # default izopen config file
 izopen_conf_dir="$HOME/.config/izopen"
 izopen_cache_dir="$HOME/.cache/izopen"
 izopen_conf_file="$izopen_conf_dir/izopen.conf"
-izopen_conf_socks_port_current="$izopen_conf_dir/socks_port_current.conf"
+izopen_conf_tunnel_port_current="$izopen_cache_dir/tunnelport.conf"
 
 izopen_conf_hosts_dir="$izopen_conf_dir/hosts"
-izopen_conf_proxychains_dir="$izopen_conf_dir/proxychains"
+#izopen_conf_proxychains_dir="$izopen_conf_dir/proxychains"
+izopen_conf_proxychains_conf="$izopen_cache_dir/proxychains.conf"
 
 # make dirs if not exist
 [ ! -e "$izopen_conf_dir" ] && mkdir -p "$izopen_conf_dir"
 [ ! -e "$izopen_conf_hosts_dir" ] && mkdir -p "$izopen_conf_hosts_dir"
-[ ! -e "$izopen_conf_proxychains_dir" ] && mkdir -p "$izopen_conf_proxychains_dir"
+#[ ! -e "$izopen_conf_proxychains_dir" ] && mkdir -p "$izopen_conf_proxychains_dir"
 
 # izopen log file
 izopen_log_file="$izopen_conf_dir/izopen.log"
@@ -188,17 +189,25 @@ function make_default_config() {
 #helper_cmd[terminal]="konsole"
 #helper_opts[terminal]="--noclose"
 
+
 ### ssh options
 #helper_cmd[ssh]="ssh"
 helper_opts[ssh]="-o StrictHostKeyChecking=no -o CheckHostIP=no"
 
+
 ### rdp options
-## remmina
-helper_cmd[rdp]="remmina"
-helper_conf[rdp]="drive=/tmp window_maximize=0 window_width=1600 window_height=1000 tls-seclevel=0 ignore-tls-errors=1"
+## rdesktop
+#helper_cmd[rdp]="rdesktop"
+#helper_opts[rdp]="-k it -g 1280x780"
+
 ## freerdp
 #helper_cmd[rdp]="xfreerdp"
 #helper_opts[rdp]="/drive:/tmp /kbd:0x00020409"
+
+## remmina
+helper_cmd[rdp]="remmina"
+helper_conf[rdp]="drive=/tmp window_maximize=0 window_width=1600 window_height=1000 tls-seclevel=0 ignore-tls-errors=1"
+
 
 ### browser options
 #helper_cmd[http]="google-chrome"
@@ -208,9 +217,11 @@ helper_conf[rdp]="drive=/tmp window_maximize=0 window_width=1600 window_height=1
 #helper_name[http]="google-chrome"
 #helper_cmd[http]:="/c/Program\ Files/Google/Chrome/Application/chrome.exe"}
 
+
 ### vnc options
 ## vncviewer
 #helper_cmd[vnc]="vncviewer"
+
 ## remmina
 #helper_cmd[vnc]="remmina"
 #helper_conf[vnc]="window_maximize=0 window_width=1600 window_height=1000"
@@ -324,13 +335,6 @@ function helper_ssh() {
   
   # launch the uri
   helper_cmd+="${helper_prepend}${helper_cmd[ssh]}${helper_opts}"
-
-  #######
-  ## TEST
-  #######
-  ## colorized prompt:
-  #helper_cmd="gnome-terminal -e \"ssh $([ -n "$port" ] && echo "-p $port") $username@$host ${helper_opts}\""
-  #helper_opts[ssh]="--title=\"export PS1='\e[0;31m[\u@\h \W]\$ \e[m '; exec bash\""
 }
 
 function helper_telnet() {
@@ -448,7 +452,7 @@ function helper_rdp() {
   # run the connection
   case ${helper_name[rdp]} in
     rdesktop)
-      helper_opts+=" -k it -g 1280x780"
+      #helper_opts+=" -k it -g 1280x780"
 
       # escape all special characters in password
       [ ! -z "$password" ] && password=$(echo $password | sed 's/[^a-zA-Z0-9]/\\&/g')
@@ -466,7 +470,11 @@ function helper_rdp() {
       [ ! -z "$password" ] && password=$(echo $password | sed 's/[^a-zA-Z0-9]/\\&/g')
 
       # FIXME: this function always use the default keyboard
-      helper_opts+=" +clipboard +auto-reconnect /auto-reconnect-max-retries:2 +bitmap-cache +compression /gdi:hw -wallpaper /dynamic-resolution /size:85% /cert-tofu /cert-ignore /log-level:ERROR"
+      # xfreerdp < 3.x
+      #helper_opts+=" +clipboard +auto-reconnect /auto-reconnect-max-retries:2 +bitmap-cache +compression /gdi:hw -wallpaper /dynamic-resolution /size:85% /cert-tofu /cert-ignore /log-level:ERROR"
+
+      # xfreerdp > 3.x
+      helper_opts+=" +clipboard +auto-reconnect /auto-reconnect-max-retries:2 /cache:bitmap:on +compression /gdi:hw -wallpaper /dynamic-resolution /size:85% /cert:ignore /log-level:ERROR"
 
       #kbd_layout="$(setxkbmap -print | grep xkb_symbols | awk '{print $4}' | awk -F"+" '{print $2}' | awk -F":" '{print $1}')"
       #case "$kbd_layout" in
@@ -553,7 +561,6 @@ function helper_vnc() {
       [ ! -z "$password" ] && password=$(echo $password | sed 's/[^a-zA-Z0-9]/\\&/g')
 
       # vnc doesn't support username and actually don't accept the password. use the gnome keyring instead for this
-      #helper_cmd="vinagre $schema://$host$([ -n $port ] && echo ":$port")"
       [ -n $port ] && helper_opts+=":$port"
 
       # launch the uri
@@ -645,6 +652,38 @@ function helper_cifs() {
 #########################################################################
 
 # create tunnel
+function make_proxychains_conf() {
+  cat <<EOF
+strict_chain
+#quiet_mode
+proxy_dns
+remote_dns_subnet 224
+tcp_read_time_out 15000
+tcp_connect_time_out 8000
+
+[ProxyList]
+socks5 127.0.0.1 $1
+EOF
+}
+
+## find duplicated ports
+# find "/home/jin/.config/izopen/hosts" -maxdepth 1 -type f -name '*.conf' -exec awk '{print FILENAME ":" $0}' {} + | grep -E ':[0-9]+$' | sort -t: -k2,2n | awk -F: '{c[$2]++; f[$2]=f[$2]?f[$2]", "$1:$1} END{for(p in c) if(c[p]>1) print "Porta "p" duplicata in: "f[p]}' | sort -n -k2
+
+function find_available_port() {
+  local dir="$1"
+  local min_port="${2:-1024}"
+  local max_port="${3:-65535}"
+  local mode="${4:-first}"  # first o last
+
+  if [[ "$mode" == "first" ]]; then
+    # primo porta disponibile
+    find "$dir" -maxdepth 1 -type f -name '*.conf' -exec cat {} + | grep -E '^[0-9]+$' | sort -n | uniq | awk -v min="$min_port" -v max="$max_port" 'BEGIN{prev=min-1;found=0} {if($1<=prev||$1<min||$1>max)next; if($1-prev>1){print prev+1;found=1;exit} prev=$1} END{if(!found&&prev<max)print prev+1}'
+  else
+    # ultima porta disponibile
+    echo $(( $(find "$dir" -maxdepth 1 -type f -name '*.conf' -exec cat {} + | sort -n | tail -n1) + 1 ))
+  fi
+}
+
 function helper_tunnel_create() {
  # put specific address port forwarding port config file
  izopen_conf_socks_host="$izopen_conf_hosts_dir/$(echo $host | sed -e 's/[^A-Za-z0-9_-]/_/g').conf"
@@ -653,6 +692,10 @@ function helper_tunnel_create() {
  izopen_conf_socks_host_legacy="$izopen_conf_dir/$(echo $host | sed -e 's/[^A-Za-z0-9_-]/_/g').conf"
  [ -e "$izopen_conf_socks_host_legacy" ] && mv "$izopen_conf_socks_host_legacy" "$izopen_conf_socks_host"
   
+ # remove legacy files
+ [ -e "$izopen_conf_dir/socks_port_current.conf" ] && rm -f "$izopen_conf_dir/socks_port_current.conf"
+ [ -e "$izopen_conf_dir/proxychains" ] && rm -f "$izopen_conf_dir/proxychains/*.conf" && rmdir "$izopen_conf_dir/proxychains"
+
  # don't create a new tunnel if it's already opened
  if [ -f "$izopen_conf_socks_host" ]
   then
@@ -671,36 +714,16 @@ function helper_tunnel_create() {
     if [ ! -e "$izopen_conf_socks_host" ] ; then
       # find first free usable port
       local tunnel_port
-      tunnel_port=$tunnel_port_min
-
-      until [ ! -z "$tunnel_port_create" ]; do
-        izopen_conf_socks_proxy="$izopen_conf_proxychains_dir/$tunnel_port.conf"
-        if [ ! -e "$izopen_conf_socks_proxy" ];then
-            tunnel_port_create=$tunnel_port
-          else
-            let tunnel_port++
-        fi
-      done
       # save the current used port for the specified host
-      echo $tunnel_port_create > "$izopen_conf_socks_host"
+      tunnel_port="$(find_available_port "${izopen_conf_hosts_dir}" ${tunnel_port_min} ${tunnel_port_max} first)"
+      echo $tunnel_port > "$izopen_conf_socks_host"
     fi
 
-    # make proxychains config if not exist
-    izopen_conf_socks_proxy="$izopen_conf_proxychains_dir/$tunnel_port_create.conf"
-    if [ ! -e "$izopen_conf_socks_proxy" ]; then
-    echo -e "strict_chain
-#quiet_mode
-proxy_dns
-remote_dns_subnet 224
-tcp_read_time_out 15000
-tcp_connect_time_out 8000
-
-[ProxyList]
-socks5 127.0.0.1 $tunnel_port_create" > "$izopen_conf_socks_proxy"
-    fi
+    tunnel_port_create=$(cat "$izopen_conf_socks_host")
+    make_proxychains_conf $tunnel_port_create > $izopen_conf_proxychains_conf
 
     # save the last used/reused port
-    echo $tunnel_port_create > "$izopen_conf_socks_port_current"
+    echo -n $tunnel_port_create > "$izopen_conf_tunnel_port_current"
  fi
 }
 
@@ -708,16 +731,16 @@ socks5 127.0.0.1 $tunnel_port_create" > "$izopen_conf_socks_proxy"
 function helper_tunnel_use() {
   #tunnel_port_use=$(LANG=C yad --title="izOpen SSH Proxy" --entry --entry-text=$tunnel_port_use --text="Inserire la porta del Proxy Socks \nCompresa fra $tunnel_port_min e $tunnel_port_max\n" 2>/dev/null)
 
-  if [[ -e "$izopen_conf_socks_port_current" && -z "$tunnel_port_use" ]]; then
+  if [[ -e "$izopen_conf_tunnel_port_current" && -z "$tunnel_port_use" ]]; then
     # read the latest tunnel port used if not specified
-    tunnel_port_use="$(cat "$izopen_conf_socks_port_current")"
+    tunnel_port_use="$(cat "$izopen_conf_tunnel_port_current")"
     
     # request if we must use the last used port
     tunnel_port_use=$(LANG=C yad --center --title="izOpen SSH Proxy" --entry --numeric --entry-text=$tunnel_port_use --text="<b>Inserire la porta del Proxy Socks</b> \nCompresa fra $tunnel_port_min e $tunnel_port_max\n" $tunnel_port_min $tunnel_port_max --timeout=10 --timeout-indicator=bottom | tr -d [:alpha:] | tr -d [:cntrl:] | tr -d [:space:])
   fi 
   
   # save the last used port for later usage
-  [ ! -z "$tunnel_port_use" ] && echo $tunnel_port_use > "$izopen_conf_socks_port_current"
+  [ ! -z "$tunnel_port_use" ] && echo $tunnel_port_use > "$izopen_conf_tunnel_port_current"
 }
 
 function helper_tunnel_manage() {
@@ -741,7 +764,8 @@ function helper_tunnel_manage() {
   if [[ $tunnel_use = 1 && ! -z $tunnel_port_use && $tunnel_port_use =~ ^-?[0-9]+$ && $tunnel_port_use -ge $tunnel_port_min && $tunnel_port_use -le $tunnel_port_max ]]
   then
     # proxychains configuration
-    helper_prepend="proxychains4 -f $izopen_conf_proxychains_dir/$tunnel_port_use.conf "
+    helper_prepend="proxychains4 -f $izopen_conf_proxychains_conf "
+
   #  else
   #    [ ! -z $tunnel_port_use ] && LANG=C yad --center --error --text="La porta specificata non è valida: $tunnel_port_use\n\nInserire una porta compresa fra $tunnel_port_min e $tunnel_port_max" 2>/dev/null && unset tunnel_port_use
   fi
@@ -939,6 +963,8 @@ function uri_open() {
         print_log_header
 
         # make the connection to the remote server
+        #echo "${helper_cmd[@]}"
+        #"${helper_cmd[@]}"
         eval "${helper_cmd}"
         RETVAL=$?
         
