@@ -718,10 +718,16 @@ function helper_vnc() {
       fi
       ;;
     remmina)
-      izopen_conf_remmina_dir="$izopen_conf_dir/remmina"
-      [ ! -e "$izopen_conf_remmina_dir" ] && mkdir -p "$izopen_conf_remmina_dir"
-      connection_name="$(echo $host | sed -e 's/[^A-Za-z0-9_-]/_/g')"
-      izopen_conf_remmina_conf="$izopen_conf_remmina_dir/${connection_name}_${schema}.remmina"
+      # izopen_conf_remmina_dir="$izopen_conf_dir/remmina"
+      # [ ! -e "$izopen_conf_remmina_dir" ] && mkdir -p "$izopen_conf_remmina_dir"
+      # connection_name="$(echo $host | sed -e 's/[^A-Za-z0-9_-]/_/g')"
+      # izopen_conf_remmina_conf="$izopen_conf_remmina_dir/${connection_name}_${schema}.remmina"
+
+      # remove legacy files
+      [ -e "$izopen_conf_dir/remmina" ] && rm -f $izopen_conf_dir/remmina/*.remmina && rmdir $izopen_conf_dir/remmina
+
+      # create remmina config file
+      izopen_conf_remmina_conf="$izopen_cache_dir/izopen.remmina"
 
       [ -z "$port" ] && server="$host" || server="$host:$port"
 

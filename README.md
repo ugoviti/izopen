@@ -93,6 +93,119 @@ To regenerate the config file after upgrades:
 izopen --mkconfig
 ```
 
+## Desktop Integration
+
+### MIME Type Registration
+
+Register izOpen as the default handler for remote protocols:
+
+```bash
+# Create applications directory
+mkdir -p ~/.local/share/applications/
+
+# Create desktop files
+cat > ~/.local/share/applications/izopen-ssh-handler.desktop <<'EOF'
+[Desktop Entry]
+Version=1.0
+Name=izOpen SSH Handler
+Comment=Open SSH connection to remote URI
+Exec=izopen %U
+StartupNotify=false
+Terminal=false
+Icon=utilities-terminal
+Type=Application
+Categories=Network;
+MimeType=x-scheme-handler/ssh;
+EOF
+
+cat > ~/.local/share/applications/izopen-rdp-handler.desktop <<'EOF'
+[Desktop Entry]
+Version=1.0
+Name=izOpen RDP Handler
+Comment=Open RDP connection to remote URI
+Exec=izopen %U
+StartupNotify=false
+Terminal=false
+Icon=preferences-desktop-remote-desktop
+Type=Application
+Categories=Network;
+MimeType=x-scheme-handler/rdp;
+EOF
+
+cat > ~/.local/share/applications/izopen-vnc-handler.desktop <<'EOF'
+[Desktop Entry]
+Version=1.0
+Name=izOpen VNC Handler
+Comment=Open VNC connection to remote URI
+Exec=izopen %U
+StartupNotify=false
+Terminal=false
+Icon=vinagre
+Type=Application
+Categories=Network;
+MimeType=x-scheme-handler/vnc;
+EOF
+
+cat > ~/.local/share/applications/izopen-telnet-handler.desktop <<'EOF'
+[Desktop Entry]
+Version=1.0
+Name=izOpen TELNET Handler
+Comment=Open TELNET connection to remote URI
+Exec=izopen %U
+StartupNotify=false
+Terminal=false
+Icon=utilities-terminal
+Type=Application
+Categories=Network;
+MimeType=x-scheme-handler/telnet;
+EOF
+
+# Register MIME handlers
+xdg-mime default izopen-ssh-handler.desktop x-scheme-handler/ssh
+xdg-mime default izopen-ssh-handler.desktop x-scheme-handler/sftp
+xdg-mime default izopen-rdp-handler.desktop x-scheme-handler/rdp
+xdg-mime default izopen-vnc-handler.desktop x-scheme-handler/vnc
+xdg-mime default izopen-telnet-handler.desktop x-scheme-handler/telnet
+
+# Rebuild MIME database
+update-desktop-database ~/.local/share/applications/
+update-mime-database ~/.local/share/mime/
+```
+
+### Verify Registration
+
+```bash
+xdg-mime query default x-scheme-handler/ssh
+xdg-mime query default x-scheme-handler/rdp
+xdg-mime query default x-scheme-handler/vnc
+xdg-mime query default x-scheme-handler/telnet
+```
+
+### Browser Launcher (Optional)
+
+Create a desktop launcher for opening browsers through SSH tunnels:
+
+```bash
+cat > ~/.local/share/applications/izopen-browser.desktop <<'EOF'
+#!/usr/bin/env xdg-open
+[Desktop Entry]
+Version=1.0
+Name=izOpen Web Browser
+Comment=Browse the Web through SSH tunnel SOCKS proxy
+Exec=izopen -f
+StartupNotify=false
+Terminal=false
+Type=Application
+Icon=applications-internet
+Categories=GTK;Network;WebBrowser;
+MimeType=text/html;x-scheme-handler/http;x-scheme-handler/https;
+EOF
+
+chmod +x ~/.local/share/applications/izopen-browser.desktop
+```
+
+Add this launcher to your desktop bar or application menu.
+
 ## Configuration
 
 ### Default Client Selection
@@ -309,120 +422,7 @@ Tunnel ports are saved per-host in:
 ~/.config/izopen/hosts/<sanitized_hostname>.conf
 ```
 
-## Desktop Integration
-
-### MIME Type Registration
-
-Register izOpen as the default handler for remote protocols:
-
-```bash
-# Create applications directory
-mkdir -p ~/.local/share/applications/
-
-# Create desktop files
-cat > ~/.local/share/applications/izopen-ssh-handler.desktop <<'EOF'
-[Desktop Entry]
-Version=1.0
-Name=izOpen SSH Handler
-Comment=Open SSH connection to remote URI
-Exec=izopen %U
-StartupNotify=false
-Terminal=false
-Icon=utilities-terminal
-Type=Application
-Categories=Network;
-MimeType=x-scheme-handler/ssh;
-EOF
-
-cat > ~/.local/share/applications/izopen-rdp-handler.desktop <<'EOF'
-[Desktop Entry]
-Version=1.0
-Name=izOpen RDP Handler
-Comment=Open RDP connection to remote URI
-Exec=izopen %U
-StartupNotify=false
-Terminal=false
-Icon=preferences-desktop-remote-desktop
-Type=Application
-Categories=Network;
-MimeType=x-scheme-handler/rdp;
-EOF
-
-cat > ~/.local/share/applications/izopen-vnc-handler.desktop <<'EOF'
-[Desktop Entry]
-Version=1.0
-Name=izOpen VNC Handler
-Comment=Open VNC connection to remote URI
-Exec=izopen %U
-StartupNotify=false
-Terminal=false
-Icon=vinagre
-Type=Application
-Categories=Network;
-MimeType=x-scheme-handler/vnc;
-EOF
-
-cat > ~/.local/share/applications/izopen-telnet-handler.desktop <<'EOF'
-[Desktop Entry]
-Version=1.0
-Name=izOpen TELNET Handler
-Comment=Open TELNET connection to remote URI
-Exec=izopen %U
-StartupNotify=false
-Terminal=false
-Icon=utilities-terminal
-Type=Application
-Categories=Network;
-MimeType=x-scheme-handler/telnet;
-EOF
-
-# Register MIME handlers
-xdg-mime default izopen-ssh-handler.desktop x-scheme-handler/ssh
-xdg-mime default izopen-ssh-handler.desktop x-scheme-handler/sftp
-xdg-mime default izopen-rdp-handler.desktop x-scheme-handler/rdp
-xdg-mime default izopen-vnc-handler.desktop x-scheme-handler/vnc
-xdg-mime default izopen-telnet-handler.desktop x-scheme-handler/telnet
-
-# Rebuild MIME database
-update-desktop-database ~/.local/share/applications/
-update-mime-database ~/.local/share/mime/
-```
-
-### Verify Registration
-
-```bash
-xdg-mime query default x-scheme-handler/ssh
-xdg-mime query default x-scheme-handler/rdp
-xdg-mime query default x-scheme-handler/vnc
-xdg-mime query default x-scheme-handler/telnet
-```
-
-### Browser Launcher (Optional)
-
-Create a desktop launcher for opening browsers through SSH tunnels:
-
-```bash
-cat > ~/.local/share/applications/izopen-browser.desktop <<'EOF'
-#!/usr/bin/env xdg-open
-[Desktop Entry]
-Version=1.0
-Name=izOpen Web Browser
-Comment=Browse the Web through SSH tunnel SOCKS proxy
-Exec=izopen -f
-StartupNotify=false
-Terminal=false
-Type=Application
-Icon=applications-internet
-Categories=GTK;Network;WebBrowser;
-MimeType=text/html;x-scheme-handler/http;x-scheme-handler/https;
-EOF
-
-chmod +x ~/.local/share/applications/izopen-browser.desktop
-```
-
-Add this launcher to your desktop bar or application menu.
-
-## Windows Installation
+## Windows Installation (W.I.P)
 
 izOpen can run on Windows using WSL or Cygwin.
 
@@ -573,11 +573,10 @@ xdg-mime query default x-scheme-handler/ssh
 ~/.config/izopen/izopen.conf                 # User configuration
 ~/.config/izopen/izopen.log                  # Connection log
 ~/.config/izopen/hosts/<host>.conf           # Per-host tunnel ports
+~/.config/izopen/google-chrome/<port>/       # Per-tunnel Chrome profiles
 ~/.cache/izopen/proxychains.conf             # Generated proxychains config
 ~/.cache/izopen/tunnel_port_current.conf     # Last used tunnel port
 ~/.cache/izopen/izopen.remmina               # Cached remmina RDP config
-~/.config/izopen/remmina/<host>_vnc.remmina  # Per-host remmina VNC configs
-~/.config/izopen/google-chrome/<port>/       # Per-tunnel Chrome profiles
 ```
 
 ## Contributing
