@@ -1332,7 +1332,7 @@ function helper_tunnel_create() {
   # Remove legacy files (one-time cleanup)
   [ -e "$izopen_conf_dir/socks_port_current.conf" ] && rm -f "$izopen_conf_dir/socks_port_current.conf"
   [ -e "$izopen_cache_dir/tunnel.conf" ] && rm -f "$izopen_cache_dir/tunnel.conf"
-  [ -e "$izopen_conf_dir/proxychains" ] && rm -f "$izopen_conf_dir/proxychains/*.conf" && rmdir "$izopen_conf_dir/proxychains" 2>/dev/null
+  [ -e "$izopen_conf_dir/proxychains" ] && rm -f "$izopen_conf_dir"/proxychains/*.conf && rmdir "$izopen_conf_dir/proxychains" 2>/dev/null
 
   # Get existing port for this host from JSON
   tunnel_port_create=$(tunnel_json_get "$host")
