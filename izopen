@@ -2,7 +2,7 @@
 NAME="izopen"
 DESCRIPTION="multi protocol bash script to auto opening given URI and auto creating ssh reverse tunnel socks proxy"
 VERSION="3.1.0"
-VERSION_DATE="20251101"
+VERSION_DATE="20251102"
 
 ################################################################################
 # izOpen - Multi-Protocol URI Launcher with SSH Tunnel Support
