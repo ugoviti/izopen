@@ -443,10 +443,10 @@ ignore-tls-errors=1"
   esac
 
   # Generate config
+  #$([ $tunnel_use = 1 ] && echo -e "proxy_type=socks5\nproxy_hostname=127.0.0.1\nproxy_port=$tunnel_port_use")
   cat > "$conf_file" <<EOF
 [remmina]
 name=$host
-#$([ $tunnel_use = 1 ] && echo -e "proxy_type=socks5\nproxy_hostname=127.0.0.1\nproxy_port=$tunnel_port_use")
 protocol=$protocol_upper
 viewmode=1
 window_maximize=1
