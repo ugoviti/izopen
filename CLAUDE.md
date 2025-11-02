@@ -200,6 +200,12 @@ helper_cmd[vnc]="vncviewer"   # TigerVNC viewer
 # Other
 helper_cmd[http]="firefox"
 helper_cmd[terminal]="alacritty"
+
+# Dialog tool for RDP/VNC connection forms
+dialog_tool="zenity"     # Use Zenity for dialogs
+dialog_tool="kdialog"    # Use KDialog for dialogs
+dialog_tool="yad"        # Use YAD for dialogs
+# If not set, auto-detection is performed (zenity > kdialog > yad)
 ```
 
 **Modifying RDP/VNC defaults:**

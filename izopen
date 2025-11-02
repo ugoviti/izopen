@@ -1,7 +1,7 @@
 #!/bin/bash
 NAME="izopen"
 DESCRIPTION="multi protocol bash script to auto opening given URI and auto creating ssh reverse tunnel socks proxy"
-VERSION="3.1.0"
+VERSION="3.1.1"
 VERSION_DATE="20251102"
 
 ################################################################################
@@ -189,6 +189,11 @@ function env_os_linux() {
   fi
 
   : ${helper_cmd[terminal]:="${helper_name[terminal]}"}
+
+  # default dialog tool for forms (rdp, vnc)
+  # Auto-detect if not set in config
+  # Supported values: zenity, kdialog, yad
+  : ${dialog_tool:=""}
 }
 
 # Configure environment for Windows (Cygwin/MSYS2) systems
@@ -300,11 +305,11 @@ helper_opts[ssh]="-o StrictHostKeyChecking=no -o CheckHostIP=no"
 
 ## freerdp
 #helper_cmd[rdp]="xfreerdp"
-#helper_opts[rdp]="/drive:/tmp /kbd:0x00020409"
+#helper_opts[rdp]="/drive:/tmp /kbd:unicode:on"
 
 ## remmina
 helper_cmd[rdp]="remmina"
-helper_conf[rdp]="drive=/tmp window_maximize=0 window_width=1600 window_height=1000 tls-seclevel=0 ignore-tls-errors=1"
+helper_conf[rdp]="drive=/tmp window_maximize=0 window_width=1820 window_height=980 tls-seclevel=0 ignore-tls-errors=1"
 
 ## krdc (KDE Remote Desktop Client)
 #helper_cmd[rdp]="krdc"
@@ -326,7 +331,7 @@ helper_conf[rdp]="drive=/tmp window_maximize=0 window_width=1600 window_height=1
 
 ## remmina
 #helper_cmd[vnc]="remmina"
-#helper_conf[vnc]="window_maximize=0 window_width=1600 window_height=1000"
+#helper_conf[vnc]="window_maximize=0 window_width=1820 window_height=980"
 
 ## krdc (KDE Remote Desktop Client)
 #helper_cmd[vnc]="krdc"
@@ -337,6 +342,14 @@ helper_conf[rdp]="drive=/tmp window_maximize=0 window_width=1600 window_height=1
 #helper_cmd[telnet]="telnet"
 #helper_cmd[smb]="xdg-open"
 #helper_cmd[cifs]="xdg-open"
+
+### dialog tool options
+## Dialog tool for RDP/VNC connection forms
+## Supported: zenity, kdialog, yad
+## If not set, auto-detection is performed (zenity > kdialog > yad)
+#dialog_tool="zenity"
+#dialog_tool="kdialog"
+#dialog_tool="yad"
 
 ## misc options
 #debug=1
@@ -433,12 +446,15 @@ function generate_remmina_config() {
 
   case "$protocol" in
     rdp)
-      extra_settings="resolution_mode=2
-scale=2"
+      extra_settings+=" resolution_mode=2"
+      extra_settings+=" scale=2"
+      extra_settings+=" rdp_use_client_keymap=1"
+      # Add domain if present (RDP-specific)
+      [ -n "$domain" ] && extra_settings+=" domain=$domain"
       ;;
     vnc)
-      extra_settings="scale=1
-ignore-tls-errors=1"
+      extra_settings+=" scale=1"
+      extra_settings+=" ignore-tls-errors=1"
       ;;
   esac
 
@@ -450,12 +466,11 @@ name=$host
 protocol=$protocol_upper
 viewmode=1
 window_maximize=1
-$extra_settings
+$(for setting in ${extra_settings}; do echo -e "$setting";done)
 server=$server
-$([ ! -z "$domain" ] && [ "$protocol" = "rdp" ] && echo "domain=$domain")
-$([ ! -z "$username" ] && echo "username=$username")
-$([ ! -z "$password" ] && echo "password=$password")
-$(for conf in ${helper_conf[$protocol]}; do echo -e "$conf\n";done)
+$([ -n "$username" ] && echo "username=$username")
+$([ -n "$password" ] && echo "password=$password")
+$(for conf in ${helper_conf[$protocol]}; do echo -e "$conf";done)
 EOF
 
   # Set secure permissions (password is stored in plaintext)
@@ -518,10 +533,24 @@ function helper_terminal() {
 #########################################################################
 
 # Detect desktop environment and select appropriate dialog tool
+# If dialog_tool is already set in config, validate it and use it
+# Otherwise auto-detect based on available commands
 function detect_dialog_tool() {
-  # Default to zenity if available, otherwise fallback to yad
+  # If dialog_tool is already set in config, validate it
+  if [ -n "$dialog_tool" ]; then
+    # Check if the configured tool is available
+    if command -v "$dialog_tool" &> /dev/null; then
+      return 0
+    else
+      echo "WARNING: configured dialog_tool '$dialog_tool' not found, auto-detecting..." >&2
+    fi
+  fi
+
+  # Auto-detect: prefer zenity, fallback to kdialog, then yad
   if command -v zenity &> /dev/null; then
     dialog_tool="zenity"
+  elif command -v kdialog &> /dev/null; then
+    dialog_tool="kdialog"
   else
     dialog_tool="yad"
   fi
