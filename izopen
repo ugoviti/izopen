@@ -122,7 +122,7 @@ declare -a izopen_connect=()
 # Auto-detects terminal emulator based on desktop environment (KDE, GNOME, MATE, XFCE)
 # All settings can be overridden in user config file
 function env_os_linux() {
-  system_commands="nc xdg-open ssh sshpass telnet proxychains"
+  system_commands="nc xdg-open ssh sshpass telnet proxychains jq"
 
   ## misc options
   : ${clipboard_use:=1}
@@ -246,19 +246,18 @@ _PROG=$( echo ${0##*/} )     # define the command name
 izopen_conf_dir="$HOME/.config/izopen"
 izopen_cache_dir="$HOME/.cache/izopen"
 izopen_conf_file="$izopen_conf_dir/izopen.conf"
-izopen_conf_tunnel_port_current="$izopen_cache_dir/port.conf"
+izopen_conf_tunnel_port_current="$izopen_cache_dir/tunnel.conf"
+izopen_conf_tunnels_json="$izopen_conf_dir/tunnels.json"
 
-izopen_conf_hosts_dir="$izopen_conf_dir/hosts"
+izopen_conf_hosts_dir="$izopen_conf_dir/hosts"  # Legacy, for migration only
 izopen_conf_proxychains_conf="$izopen_cache_dir/proxy.conf"
 
 # make dirs if not exist
 [ ! -e "$izopen_conf_dir" ] && mkdir -p "$izopen_conf_dir"
-[ ! -e "$izopen_conf_hosts_dir" ] && mkdir -p "$izopen_conf_hosts_dir"
 [ ! -e "$izopen_cache_dir" ] && mkdir -p "$izopen_cache_dir"
 
 # ensure secure permissions on directories (always, even if they already exist)
 chmod 700 "$izopen_conf_dir" 2>/dev/null
-chmod 700 "$izopen_conf_hosts_dir" 2>/dev/null
 chmod 700 "$izopen_cache_dir" 2>/dev/null
 
 # izopen log file - create if doesn't exist and ensure secure permissions
@@ -1108,70 +1107,254 @@ socks5 127.0.0.1 $1
 EOF
 }
 
-# Find available port in specified range
-# Scans existing port config files and finds first gap or next port after last used
-# Usage: find_available_port <dir> [min_port] [max_port] [mode]
+#########################################################################
+# TUNNEL JSON DATABASE FUNCTIONS
+# Manage tunnel port mappings in JSON format with metadata
+#########################################################################
+
+# Helper function to safely update JSON file with atomic write
+# Usage: jq_update <jq_expression> <file>
+# Example: jq_update '.tunnels["host"] = {...}' "$izopen_conf_tunnels_json"
+function jq_update() {
+  local jq_expr="$1"
+  local file="$2"
+  shift 2
+
+  # Pass remaining arguments to jq (--arg, etc.)
+  jq "$@" "$jq_expr" "$file" > "${file}.tmp" && \
+    mv "${file}.tmp" "$file" && \
+    chmod 600 "$file"
+}
+
+# Initialize tunnels.json file if it doesn't exist
+# Creates empty JSON structure with version field
+# Sets secure file permissions (600)
+# Usage: tunnel_json_init
+function tunnel_json_init() {
+  if [ ! -e "$izopen_conf_tunnels_json" ]; then
+    echo '{"version":"1.0","tunnels":{}}' > "$izopen_conf_tunnels_json"
+    chmod 600 "$izopen_conf_tunnels_json"
+  fi
+}
+
+# Get tunnel port for a given host from JSON database
+# Returns port number or empty if host not found
+# Usage: tunnel_json_get <host>
 # Parameters:
-#   $1 - Directory containing *.conf files with port numbers
-#   $2 - Minimum port number (default: 1024)
-#   $3 - Maximum port number (default: 65535)
-#   $4 - Mode: "first" (find first gap) or "last" (next after last used)
-# Algorithm: Reads all ports from .conf files, finds first gap in sequence, or returns prev+1
+#   $1 - Hostname or IP address
+# Returns: Port number via stdout, or empty if not found
+function tunnel_json_get() {
+  local host="$1"
+
+  [ ! -e "$izopen_conf_tunnels_json" ] && return 1
+
+  jq -r ".tunnels[\"$host\"].port // empty" "$izopen_conf_tunnels_json" 2>/dev/null
+}
+
+# Set/update tunnel port for a given host in JSON database
+# Creates new entry or updates existing with metadata
+# New entries: sets created, last_used, connection_count=1
+# Existing entries: updates last_used, increments connection_count
+# Usage: tunnel_json_set <host> <port>
+# Parameters:
+#   $1 - Hostname or IP address
+#   $2 - Port number
+function tunnel_json_set() {
+  local host="$1"
+  local port="$2"
+  local timestamp="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+
+  # Initialize if doesn't exist
+  tunnel_json_init
+
+  # Backup before modifying
+  [ -e "$izopen_conf_tunnels_json" ] && cp -p "$izopen_conf_tunnels_json" "$izopen_conf_tunnels_json.bak"
+
+  # Check if host already exists
+  local existing_port=$(tunnel_json_get "$host")
+
+  if [ -z "$existing_port" ]; then
+    # New entry: set all fields
+    jq_update '.tunnels[$host] = {"port": ($port | tonumber), "created": $timestamp, "last_used": $timestamp, "connection_count": 1}' \
+      "$izopen_conf_tunnels_json" \
+      --arg host "$host" \
+      --arg port "$port" \
+      --arg timestamp "$timestamp"
+  else
+    # Existing entry: update last_used and increment connection_count
+    jq_update '.tunnels[$host].last_used = $timestamp | .tunnels[$host].connection_count += 1' \
+      "$izopen_conf_tunnels_json" \
+      --arg host "$host" \
+      --arg timestamp "$timestamp"
+  fi
+}
+
+# Migrate legacy tunnel configuration from hosts/*.conf to tunnels.json
+# Merges legacy .conf files with existing JSON data (existing entries take priority)
+# Scans ~/.config/izopen/hosts/ directory for .conf files
+# Extracts hostname and port from each file
+# Uses file modification time for created/last_used timestamps
+# Only adds hosts that don't already exist in JSON (non-destructive merge)
+# Deletes legacy files and directory after successful migration
+# Shows progress during migration
+# Usage: migrate_legacy_tunnels
+function migrate_legacy_tunnels() {
+  # Skip if no legacy directory exists
+  [ ! -d "$izopen_conf_hosts_dir" ] && return 0
+
+  # Skip if no .conf files exist
+  local conf_count=$(find "$izopen_conf_hosts_dir" -maxdepth 1 -type f -name '*.conf' 2>/dev/null | wc -l)
+  [ "$conf_count" -eq 0 ] && return 0
+
+  # Show migration start message
+  echo "Migrating legacy tunnel configuration..."
+  echo "Found $conf_count .conf files to process"
+
+  # Initialize JSON if needed (ensures we have a base to merge into)
+  tunnel_json_init
+
+  # Backup existing JSON
+  cp -p "$izopen_conf_tunnels_json" "$izopen_conf_tunnels_json.bak"
+
+  # Process each .conf file and merge into existing JSON
+  # IMPORTANT: Use process substitution instead of pipe to avoid subshell
+  local migrated_count=0
+  local skipped_count=0
+  local processed_count=0
+  local progress_interval=100
+
+  while IFS= read -r conf_file; do
+    # Extract sanitized hostname from filename (remove .conf extension)
+    local hostname_sanitized=$(basename "$conf_file" .conf)
+
+    # Restore original hostname by converting ALL underscores back to dots
+    # The original sanitization: sed 's/[^A-Za-z0-9_-]/_/g' replaced all non-alphanumeric chars (including dots) with underscores
+    # Examples: 10_1_1_26.conf → 10.1.1.26, vpn01_quantico_srl.conf → vpn01.quantico.srl
+    local hostname=$(echo "$hostname_sanitized" | tr '_' '.')
+
+    # Read port from file
+    local port=$(cat "$conf_file" 2>/dev/null)
+
+    # Skip if port is invalid
+    if [[ ! "$port" =~ ^[0-9]+$ ]]; then
+      rm -f "$conf_file"
+      processed_count=$((processed_count + 1))
+      continue
+    fi
+
+    # Check if host already exists in JSON (existing entries have priority)
+    local existing_port=$(tunnel_json_get "$hostname")
+
+    if [ -z "$existing_port" ]; then
+      # Host doesn't exist in JSON - add it with preserved timestamp
+      local timestamp=$(stat -c %Y "$conf_file" 2>/dev/null || stat -f %m "$conf_file" 2>/dev/null)
+      local timestamp_iso=$(date -u -d "@$timestamp" +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date -u -r "$timestamp" +%Y-%m-%dT%H:%M:%SZ 2>/dev/null)
+
+      # Add new entry using jq (atomic operation with automatic backup)
+      jq_update '.tunnels[$host] = {"port": ($port | tonumber), "created": $timestamp, "last_used": $timestamp, "connection_count": 1}' \
+        "$izopen_conf_tunnels_json" \
+        --arg host "$hostname" \
+        --arg port "$port" \
+        --arg timestamp "$timestamp_iso" 2>/dev/null
+
+      migrated_count=$((migrated_count + 1))
+    else
+      # Host already exists in JSON - skip (existing data takes priority)
+      skipped_count=$((skipped_count + 1))
+    fi
+
+    # Delete migrated or skipped .conf file
+    rm -f "$conf_file"
+
+    # Update progress counter
+    processed_count=$((processed_count + 1))
+
+    # Show progress every N files
+    if [ $((processed_count % progress_interval)) -eq 0 ]; then
+      local percentage=$((processed_count * 100 / conf_count))
+      echo "Processing: $processed_count/$conf_count ($percentage%)..."
+    fi
+  done < <(find "$izopen_conf_hosts_dir" -maxdepth 1 -type f -name '*.conf' 2>/dev/null | sort)
+
+  # Show final migration statistics
+  echo "Migration completed: $migrated_count new hosts added, $skipped_count existing hosts preserved"
+
+  # Remove hosts directory if empty
+  if rmdir "$izopen_conf_hosts_dir" 2>/dev/null; then
+    echo "Legacy hosts directory removed"
+  fi
+}
+
+# Find available port in specified range
+# Reads all ports from tunnels.json and finds first gap or next port after last used
+# Usage: find_available_port [min_port] [max_port] [mode]
+# Parameters:
+#   $1 - Minimum port number (default: 1024)
+#   $2 - Maximum port number (default: 65535)
+#   $3 - Mode: "first" (find first gap) or "last" (next after last used)
+# Algorithm: Reads all ports from JSON, finds first gap in sequence, or returns prev+1
 function find_available_port() {
-  local dir="$1"
-  local min_port="${2:-1024}"
-  local max_port="${3:-65535}"
-  local mode="${4:-first}"  # first o last
+  local min_port="${1:-1024}"
+  local max_port="${2:-65535}"
+  local mode="${3:-first}"  # first o last
+
+  # Return min_port if JSON doesn't exist (first tunnel ever)
+  [ ! -e "$izopen_conf_tunnels_json" ] && echo "$min_port" && return 0
 
   if [[ "$mode" == "first" ]]; then
-    # primo porta disponibile
-    find "$dir" -maxdepth 1 -type f -name '*.conf' -exec cat {} + | grep -E '^[0-9]+$' | sort -n | uniq | awk -v min="$min_port" -v max="$max_port" 'BEGIN{prev=min-1;found=0} {if($1<=prev||$1<min||$1>max)next; if($1-prev>1){print prev+1;found=1;exit} prev=$1} END{if(!found&&prev<max)print prev+1}'
+    # Find first available port (first gap in sequence)
+    jq -r '.tunnels[].port' "$izopen_conf_tunnels_json" 2>/dev/null | \
+      sort -n | uniq | \
+      awk -v min="$min_port" -v max="$max_port" '
+        BEGIN{prev=min-1; found=0}
+        {
+          if($1<=prev || $1<min || $1>max) next;
+          if($1-prev>1) {print prev+1; found=1; exit}
+          prev=$1
+        }
+        END{if(!found && prev<max) print prev+1}
+      '
   else
-    # ultima porta disponibile
-    echo $(( $(find "$dir" -maxdepth 1 -type f -name '*.conf' -exec cat {} + | sort -n | tail -n1) + 1 ))
+    # Find last port + 1
+    local last_port=$(jq -r '.tunnels[].port' "$izopen_conf_tunnels_json" 2>/dev/null | sort -n | tail -n1)
+    if [ -z "$last_port" ]; then
+      echo "$min_port"
+    else
+      echo $((last_port + 1))
+    fi
   fi
 }
 
 function helper_tunnel_create() {
- # put specific address port forwarding port config file
- izopen_conf_socks_host="$izopen_conf_hosts_dir/$(echo $host | sed -e 's/[^A-Za-z0-9_-]/_/g').conf"
+  # Initialize JSON if needed
+  tunnel_json_init
 
- # FIXME legacy config file path management
- izopen_conf_socks_host_legacy="$izopen_conf_dir/$(echo $host | sed -e 's/[^A-Za-z0-9_-]/_/g').conf"
- [ -e "$izopen_conf_socks_host_legacy" ] && mv "$izopen_conf_socks_host_legacy" "$izopen_conf_socks_host"
+  # Remove legacy files (one-time cleanup)
+  [ -e "$izopen_conf_dir/socks_port_current.conf" ] && rm -f "$izopen_conf_dir/socks_port_current.conf"
+  [ -e "$izopen_conf_dir/proxychains" ] && rm -f "$izopen_conf_dir/proxychains/*.conf" && rmdir "$izopen_conf_dir/proxychains" 2>/dev/null
 
- # remove legacy files
- [ -e "$izopen_conf_dir/socks_port_current.conf" ] && rm -f "$izopen_conf_dir/socks_port_current.conf"
- [ -e "$izopen_conf_dir/proxychains" ] && rm -f "$izopen_conf_dir/proxychains/*.conf" && rmdir "$izopen_conf_dir/proxychains"
+  # Get existing port for this host from JSON
+  tunnel_port_create=$(tunnel_json_get "$host")
 
- # don't create a new tunnel if it's already opened
- if [ -f "$izopen_conf_socks_host" ]
-  then
-    nc $nc_opts 127.0.0.1 $(cat "$izopen_conf_socks_host") </dev/null 2>/dev/null
+  # Don't create a new tunnel if it's already opened
+  if [ -n "$tunnel_port_create" ]; then
+    nc $nc_opts 127.0.0.1 "$tunnel_port_create" </dev/null 2>/dev/null
     [ $? != 0 ] && tunnel_create=1 || tunnel_create=0
- fi
+  fi
 
-    # import port configuration of remote address if exist
-    if [ -e "$izopen_conf_socks_host" ] ; then
-      tunnel_port_create="$(cat "$izopen_conf_socks_host")"
+  # Manage tunnel creation
+  if [ "$tunnel_create" = 1 ]; then
+    if [ -z "$tunnel_port_create" ]; then
+      # Find first free usable port
+      tunnel_port_create="$(find_available_port ${tunnel_port_min} ${tunnel_port_max} first)"
     fi
 
-# manage the proxychains tunnel configuration
- if [ "$tunnel_create" = 1 ]
-  then
-    if [ ! -e "$izopen_conf_socks_host" ] ; then
-      # find first free usable port
-      local tunnel_port
-      # save the current used port for the specified host
-      tunnel_port="$(find_available_port "${izopen_conf_hosts_dir}" ${tunnel_port_min} ${tunnel_port_max} first)"
-      echo $tunnel_port > "$izopen_conf_socks_host"
-    fi
+    # Save/update port in JSON with metadata
+    tunnel_json_set "$host" "$tunnel_port_create"
 
-    tunnel_port_create=$(cat "$izopen_conf_socks_host")
-
-    # save the last used/reused port
-    echo -n $tunnel_port_create > "$izopen_conf_tunnel_port_current"
- fi
+    # Save the last used/reused port
+    echo -n "$tunnel_port_create" > "$izopen_conf_tunnel_port_current"
+  fi
 }
 
 # Check if tunnel port is valid
@@ -1565,6 +1748,12 @@ Examples:
 EOF
 }
 
+# check if all required system commands are installed (must run before migration)
+check_system_commands $system_commands
+
+# migrate legacy tunnel configuration to JSON (automatic, one-time)
+migrate_legacy_tunnels
+
 # if not arguments print usage and exit
 [ $# = 0 ] && _usage && exit 1
 
@@ -1638,9 +1827,6 @@ done
 
 # create defualt user config file if not exist
 [ ! -e "$izopen_conf_file" ] && make_default_config > "$izopen_conf_file"
-
-# check if all required system command are installed
-check_system_commands $system_commands
 
 # detect the appropriate dialog tool based on desktop environment
 detect_dialog_tool
