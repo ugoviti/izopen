@@ -8,6 +8,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [3.1.0] - 2025-11-02
 
 ### Added
+- **JSON database for tunnel management**: Complete refactoring from legacy .conf files to single JSON database
+  - `tunnels.json`: Single source of truth for all tunnel port mappings with metadata
+  - Metadata tracking: `created`, `last_used` (ISO 8601 timestamps), `connection_count`
+  - CRUD functions: `tunnel_json_init()`, `tunnel_json_get()`, `tunnel_json_set()`
+  - `jq_update()`: Atomic JSON updates with automatic backup
+  - `find_available_port()`: Intelligent port allocation (finds first gap or next sequential)
+  - `migrate_legacy_tunnels()`: Automatic migration from 1000+ .conf files to JSON (one-time, non-destructive)
+  - Progress tracking during migration with statistics
 - **KRDC support**: KDE Remote Desktop Client now supported for both RDP and VNC protocols
   - RDP URL format: `rdp://[DOMAIN\username[:password]@]host[:port]`
   - VNC URL format: `vnc://[password@]host[:port]`
@@ -68,10 +76,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **URI sanitization**: Replaced sed with bash parameter expansion in `sanitize_uri_for_logging()`
   - `echo "$uri" | sed ...` → `echo "${uri//:$password/}"`
 - **Return early pattern**: Applied in `get_password_from_clipboard()` for cleaner flow
+- **Tunnel port configuration refactoring**: Eliminated redundant configuration files
+  - Removed `tunnel.conf` (contained only port number, redundant with `proxy.conf`)
+  - `proxy.conf` now single source of truth for last used tunnel port
+  - Smart fallback system with priority: `proxy.conf` → `tunnels.json` (sorted by last_used) → empty field
+  - `helper_tunnel_create()`: Auto-generates `proxy.conf` on SSH tunnel creation
+  - `helper_tunnel_use()`: Reads from `proxy.conf` first, falls back to most recently used tunnel from JSON
+  - Legacy cleanup: Automatic removal of deprecated `tunnel.conf`, `socks_port_current.conf`
 - **Config file locations**:
-  - `~/.cache/izopen/tunnelport.conf` → `port.conf`
+  - `~/.cache/izopen/tunnelport.conf` → `port.conf` → **removed** (redundant)
+  - `~/.cache/izopen/tunnel.conf` → **removed** (replaced by `proxy.conf` + `tunnels.json`)
   - `~/.cache/izopen/proxychains.conf` → `proxy.conf`
   - `~/.cache/izopen/izopen.remmina` → `rdp.remmina` / `vnc.remmina`
+  - `~/.config/izopen/hosts/*.conf` → `~/.config/izopen/tunnels.json` (migrated automatically)
 - **Remmina config**: Changed from per-host files in `~/.config/izopen/remmina/` to single cached file
 - **README**: Complete reorganization for v3.1.0
   - Moved Desktop Integration section before Configuration
@@ -98,6 +115,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Added ~250 lines of documentation and new features
 
 ### Technical Notes
+- **Tunnel port management architecture**:
+  - `tunnels.json`: Per-host tunnel mappings with metadata (SSH tunnel hosts only)
+  - `proxy.conf`: Last globally used tunnel port (highest priority for dialog pre-fill)
+  - Priority system: `proxy.conf` (last actual use) → `tunnels.json` (most recent by timestamp) → empty
+  - Migration: Process substitution `< <(find ...)` avoids subshell scope issues
+  - Atomic writes: `.tmp` → `mv` → `chmod 600` pattern throughout
 - **Password handling by client**:
   - xfreerdp 3.x: NO escaping (bash arrays handle special chars)
   - rdesktop: NO escaping
