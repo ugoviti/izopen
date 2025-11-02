@@ -220,6 +220,41 @@ helper_opts[rdp]="/drive:/tmp /kbd:..."  # xfreerdp
 helper_opts[rdp]="--fullscreen"          # krdc
 ```
 
+## Release Process
+
+When creating a new release, follow these steps:
+
+1. **Update version number** in `izopen` script (line 4):
+   ```bash
+   VERSION="X.Y.Z"
+   ```
+
+2. **Update CHANGELOG.md** with the new version:
+   - Add new section at the top with format: `## [X.Y.Z] - YYYY-MM-DD`
+   - Document all changes under appropriate categories:
+     - **Added**: New features
+     - **Changed**: Changes in existing functionality
+     - **Fixed**: Bug fixes
+     - **Removed**: Removed features
+     - **Deprecated**: Soon-to-be removed features
+     - **Security**: Security fixes
+   - Follow [Keep a Changelog](https://keepachangelog.com/) format
+
+3. **Commit changes**:
+   ```bash
+   git add .
+   git commit -m "Release X.Y.Z - Brief description"
+   ```
+
+4. **Create and push tag**:
+   ```bash
+   git tag -a X.Y.Z -m "Release X.Y.Z - Brief description"
+   git push origin master
+   git push origin X.Y.Z
+   ```
+
+**IMPORTANT**: Always update CHANGELOG.md before creating a release tag!
+
 ## Security Considerations
 
 - SSH option `-o StrictHostKeyChecking=no` is enabled by default (security risk)
