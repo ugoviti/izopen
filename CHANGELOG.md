@@ -5,6 +5,33 @@ All notable changes to izOpen will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.1.1] - 2025-11-02
+
+### Added
+- **Remmina keyboard transparency**: Added `rdp_use_client_keymap=1` to Remmina RDP configuration
+  - Enables transparent keyboard layout mapping for Remmina connections
+  - Users can now use their local keyboard layout without server-side layout conflicts
+  - Works seamlessly when client and server have different keyboard layouts
+- **Dialog tool configuration**: Added configurable `dialog_tool` option with auto-detection
+  - Supports zenity, kdialog, and yad
+  - Auto-detection priority: zenity > kdialog > yad
+  - Improves desktop environment integration (GNOME/KDE/XFCE)
+
+### Changed
+- **Remmina config refactoring**: Improved `generate_remmina_config()` function
+  - Cleaner `extra_settings` handling with individual option appending
+  - Domain configuration moved into RDP-specific `extra_settings`
+  - Better separation of protocol-specific options
+- **krdc keyboard support**: Removed automatic keyboard layout configuration for krdc
+  - krdc does not support transparent keyboard mapping like Remmina/xfreerdp
+  - Users should use Remmina (with `rdp_use_client_keymap`) or xfreerdp (with `/kbd:unicode:on`) for transparent keyboard support
+
+### Note
+For transparent keyboard layout support:
+- **Remmina**: Automatically enabled via `rdp_use_client_keymap=1`
+- **xfreerdp**: Configure with `/kbd:unicode:on` in `helper_opts[rdp]`
+- **krdc**: Not supported - use Remmina or xfreerdp instead
+
 ## [3.1.0] - 2025-11-02
 
 ### Added
