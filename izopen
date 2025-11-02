@@ -85,7 +85,7 @@ VERSION_DATE="20251101"
 #    - ONLY use on trusted networks
 #
 # 3. REMMINA CONFIG FILES
-#    - Passwords saved in plaintext: ~/.cache/izopen/izopen.remmina
+#    - Passwords saved in plaintext: ~/.cache/izopen/rdp.remmina
 #    - Files should have 600 permissions (user read/write only)
 #    - Temporary but persistent until next connection
 #
@@ -246,11 +246,10 @@ _PROG=$( echo ${0##*/} )     # define the command name
 izopen_conf_dir="$HOME/.config/izopen"
 izopen_cache_dir="$HOME/.cache/izopen"
 izopen_conf_file="$izopen_conf_dir/izopen.conf"
-izopen_conf_tunnel_port_current="$izopen_cache_dir/tunnelport.conf"
+izopen_conf_tunnel_port_current="$izopen_cache_dir/port.conf"
 
 izopen_conf_hosts_dir="$izopen_conf_dir/hosts"
-#izopen_conf_proxychains_dir="$izopen_conf_dir/proxychains"
-izopen_conf_proxychains_conf="$izopen_cache_dir/proxychains.conf"
+izopen_conf_proxychains_conf="$izopen_cache_dir/proxy.conf"
 
 # make dirs if not exist
 [ ! -e "$izopen_conf_dir" ] && mkdir -p "$izopen_conf_dir"
@@ -521,17 +520,11 @@ function helper_terminal() {
 
 # Detect desktop environment and select appropriate dialog tool
 function detect_dialog_tool() {
-  # Check if running on KDE Plasma
-  if [[ "$XDG_CURRENT_DESKTOP" == *"KDE"* ]] || [[ "$DESKTOP_SESSION" == *"plasma"* ]]; then
-    #dialog_tool="kdialog"
+  # Default to zenity if available, otherwise fallback to yad
+  if command -v zenity &> /dev/null; then
     dialog_tool="zenity"
   else
-    # Default to zenity for all other desktop environments, fallback to yad
-    if command -v zenity &> /dev/null; then
-      dialog_tool="zenity"
-    else
-      dialog_tool="yad"
-    fi
+    dialog_tool="yad"
   fi
 }
 
@@ -749,16 +742,20 @@ function helper_http() {
         # Chrome handles proxy directly via --proxy-server, skip helper_prepend (proxychains)
         helper_prepend_skip=1
 
-        izopen_connect+=(--aggressive-cache-discard)
-        izopen_connect+=(--disable-notifications)
-        izopen_connect+=(--enable-aggressive-domstorage-flushing)
-        izopen_connect+=(--disable-client-side-phishing-detection)
-        izopen_connect+=(--disable-gpu)
-        izopen_connect+=(--restore-last-session)
-        izopen_connect+=(--no-first-run)
-        izopen_connect+=(--disable-translate)
-        izopen_connect+=(--password-store=basic)
-        izopen_connect+=(--proxy-server="socks5://127.0.0.1:$tunnel_port_use")
+        # Chrome tunnel-specific options
+        local -a chrome_tunnel_opts=(
+          --aggressive-cache-discard
+          --disable-notifications
+          --enable-aggressive-domstorage-flushing
+          --disable-client-side-phishing-detection
+          --disable-gpu
+          --restore-last-session
+          --no-first-run
+          --disable-translate
+          --password-store=basic
+          --proxy-server="socks5://127.0.0.1:$tunnel_port_use"
+        )
+        izopen_connect+=("${chrome_tunnel_opts[@]}")
 
         case $OSTYPE in
           cygwin*)
@@ -800,10 +797,8 @@ function parse_rdp_domain() {
   if [[ "$username" == *"/"* ]]; then
     domain="${username%%/*}"
     username="${username#*/}"
-  fi
-
   # Using @ as domain separator, domain is the second part
-  if [[ "$username" == *"@"* ]]; then
+  elif [[ "$username" == *"@"* ]]; then
     domain="${username##*@}"
     username="${username%%@*}"
   fi
@@ -821,12 +816,7 @@ function validate_rdp_credentials() {
     local frmdata=$(dialog_form_rdp "$domain" "$host" "$username" "$password")
     [ $? != 0 ] && exit 1
 
-    domain=$(echo "$frmdata" | awk 'BEGIN {FS="|"} {print $1}')
-    host=$(echo "$frmdata" | awk 'BEGIN {FS="|"} {print $2}')
-    username=$(echo "$frmdata" | awk 'BEGIN {FS="|"} {print $3}')
-    password=$(echo "$frmdata" | awk 'BEGIN {FS="|"} {print $4}')
-    security=$(echo "$frmdata" | awk 'BEGIN {FS="|"} {print $5}')
-    console=$(echo "$frmdata" | awk 'BEGIN {FS="|"} {print $6}')
+    IFS='|' read -r domain host username password security console <<< "$frmdata"
   fi
 }
 
@@ -883,7 +873,7 @@ function helper_rdp_remmina() {
   [ -e "$izopen_conf_dir/remmina" ] && rm -f "$izopen_conf_dir"/remmina/*.remmina && rmdir "$izopen_conf_dir/remmina"
 
   # Create remmina config file
-  local izopen_conf_remmina_conf="$izopen_cache_dir/izopen.remmina"
+  local izopen_conf_remmina_conf="$izopen_cache_dir/rdp.remmina"
   local server
   [ -z "$port" ] && server="$host" || server="$host:$port"
 
@@ -966,9 +956,7 @@ function validate_vnc_credentials() {
     local frmdata=$(dialog_form_vnc "$host" "$username" "$password")
     [ $? != 0 ] && exit 1
 
-    host=$(echo "$frmdata" | awk 'BEGIN {FS="|"} {print $1}')
-    username=$(echo "$frmdata" | awk 'BEGIN {FS="|"} {print $2}')
-    password=$(echo "$frmdata" | awk 'BEGIN {FS="|"} {print $3}')
+    IFS='|' read -r host username password <<< "$frmdata"
   fi
 }
 
@@ -996,7 +984,7 @@ function helper_vnc_remmina() {
   [ -e "$izopen_conf_dir/remmina" ] && rm -f "$izopen_conf_dir"/remmina/*.remmina && rmdir "$izopen_conf_dir/remmina"
 
   # Create remmina config file
-  local izopen_conf_remmina_conf="$izopen_cache_dir/izopen.remmina"
+  local izopen_conf_remmina_conf="$izopen_cache_dir/vnc.remmina"
   local server
   [ -z "$port" ] && server="$host" || server="$host:$port"
 
@@ -1180,11 +1168,20 @@ function helper_tunnel_create() {
     fi
 
     tunnel_port_create=$(cat "$izopen_conf_socks_host")
-    make_proxychains_conf $tunnel_port_create > $izopen_conf_proxychains_conf
 
     # save the last used/reused port
     echo -n $tunnel_port_create > "$izopen_conf_tunnel_port_current"
  fi
+}
+
+# Check if tunnel port is valid
+# Validates port is non-empty, numeric, and within allowed range
+# Usage: is_valid_tunnel_port <port>
+# Returns: 0 if valid, 1 if invalid
+function is_valid_tunnel_port() {
+  local port="$1"
+  [[ -n "$port" ]] && [[ "$port" =~ ^[0-9]+$ ]] && \
+  [[ $port -ge $tunnel_port_min && $port -le $tunnel_port_max ]]
 }
 
 # use al already opened tunnel
@@ -1226,8 +1223,10 @@ function helper_tunnel_manage() {
   fi
 
   # create the proxychains4 config
-  if [[ $tunnel_use = 1 && ! -z $tunnel_port_use && $tunnel_port_use =~ ^-?[0-9]+$ && $tunnel_port_use -ge $tunnel_port_min && $tunnel_port_use -le $tunnel_port_max ]]
-  then
+  if [[ $tunnel_use = 1 ]] && is_valid_tunnel_port "$tunnel_port_use"; then
+    # Generate proxychains config with the actual port being used
+    make_proxychains_conf "$tunnel_port_use" > "$izopen_conf_proxychains_conf"
+
     # proxychains configuration
     helper_prepend="proxychains4 -f $izopen_conf_proxychains_conf "
 
@@ -1394,14 +1393,15 @@ function get_password_from_clipboard() {
       ;;
   esac
 
-  # Return clipboard contents if not empty or space
-  if [[ -n "$clipboard" && "$clipboard" != " " ]]; then
-    echo "$clipboard" | tr -d [:cntrl:]
-  fi
+  # Return early if clipboard is empty or space
+  [[ -z "$clipboard" || "$clipboard" == " " ]] && return 1
+
+  # Return clipboard contents
+  echo "$clipboard" | tr -d [:cntrl:]
 }
 
 # Sanitize URI for logging by removing password
-# Uses sed to replace password in URI with empty string
+# Uses bash parameter expansion to replace password in URI with empty string
 # Returns sanitized URI via stdout
 # Usage: sanitize_uri_for_logging "uri" "password"
 function sanitize_uri_for_logging() {
@@ -1411,9 +1411,8 @@ function sanitize_uri_for_logging() {
   if [ -z "$password" ]; then
     echo "$uri"
   else
-    # Escape password for sed regex, then remove it from URI
-    local escaped_password=$(printf '%s\n' "$password" | sed 's/[^a-zA-Z0-9]/\\&/g')
-    echo "$uri" | sed "s/:${escaped_password}//g"
+    # Remove :password from URI using bash parameter expansion
+    echo "${uri//:$password/}"
   fi
 }
 
