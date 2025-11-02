@@ -587,26 +587,3 @@ https://github.com/ugoviti/izopen
 ## License
 
 Written by Ugo Viti <u.viti@wearequantico.it>
-
-## Changelog
-
-### Version 3.1.0 (2025-01-11)
-- ✅ Added KRDC (KDE Remote Desktop Client) support for RDP and VNC
-- ✅ Fixed password handling for special characters (removed escaping for xfreerdp, rdesktop, vncviewer)
-- ✅ Added automatic URL encoding for KRDC passwords
-- ✅ Complete refactoring to use bash arrays instead of string concatenation
-- ✅ Fixed helper_prepend (proxychains) application
-- ✅ Added helper_prepend_skip for clients with native proxy support (Chrome)
-- ✅ Improved debug output to show complete commands
-- ✅ Changed remmina RDP config to single cached file
-
-### Version 3.0.7
-- Better handling of tunnel ports
-- Fewer proxychains configurations needed
-- Debian package updates
-
-### Version 3.0.x
-- Initial public release
-- Multi-protocol support
-- SSH tunnel integration
-- Password manager compatibility
