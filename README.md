@@ -4,8 +4,6 @@
 
 izOpen is a bash script designed to seamlessly open URIs with automatic SSH tunnel creation, perfect for secure remote access through password managers (KeePassXC, browser-based, etc.).
 
-**Current Version:** 3.1.0
-
 ## Features
 
 - ✅ **Multi-protocol support**: SSH, Telnet, RDP, VNC, SFTP, FTP, HTTP/HTTPS, SMB, CIFS
