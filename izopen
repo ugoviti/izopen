@@ -882,6 +882,7 @@ function helper_rdp_remmina() {
   init_helper_connection "rdp"
   izopen_connect+=("${helper_cmd[rdp]}")
   add_helper_opts "rdp"
+  [ $tunnel_use = 1 ] && izopen_connect+=("--gapplication-app-id=org.remmina.Remmina.tunnel${tunnel_port_use}")
   izopen_connect+=(-c "${izopen_conf_remmina_conf}")
 }
 
@@ -993,6 +994,7 @@ function helper_vnc_remmina() {
   init_helper_connection "vnc"
   izopen_connect+=("${helper_cmd[vnc]}")
   add_helper_opts "vnc"
+  [ $tunnel_use = 1 ] && izopen_connect+=("--gapplication-app-id=org.remmina.Remmina.tunnel${tunnel_port_use}")
   izopen_connect+=(-c "${izopen_conf_remmina_conf}")
 }
 
