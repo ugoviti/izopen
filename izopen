@@ -1353,8 +1353,10 @@ function helper_tunnel_create() {
     # Save/update port in JSON with metadata
     tunnel_json_set "$host" "$tunnel_port_create"
 
-    # Note: Port is now stored only in tunnels.json and proxy.conf
-    # No longer writing to separate tunnel.conf (eliminated redundancy)
+    # Update proxychains config with the newly created tunnel port
+    # This ensures proxy.conf is always in sync with the latest tunnel
+    make_proxychains_conf "$tunnel_port_create" > "$izopen_conf_proxychains_conf"
+    chmod 600 "$izopen_conf_proxychains_conf"
   fi
 }
 
@@ -1369,22 +1371,31 @@ function is_valid_tunnel_port() {
 }
 
 # Use an already opened tunnel
-# Reads last used port from proxychains config (single source of truth)
+# Reads last used port from proxy.conf (highest priority) or tunnels.json (fallback)
 # No longer writes to separate tunnel.conf (eliminated redundancy)
 # Usage: helper_tunnel_use
 function helper_tunnel_use() {
   #tunnel_port_use=$(LANG=C yad --title="izOpen SSH Proxy" --entry --entry-text=$tunnel_port_use --text="Inserire la porta del Proxy Socks \nCompresa fra $tunnel_port_min e $tunnel_port_max\n" 2>/dev/null)
 
-  if [[ -e "$izopen_conf_proxychains_conf" && -z "$tunnel_port_use" ]]; then
-    # Read the latest tunnel port from proxychains config (last line: "socks5 127.0.0.1 PORT")
-    tunnel_port_use=$(grep -E '^socks5' "$izopen_conf_proxychains_conf" 2>/dev/null | awk '{print $3}')
+  if [[ -z "$tunnel_port_use" ]]; then
+    # Read last used port from proxychains config (highest priority)
+    # This is the most recently used port in actual practice
+    if [[ -e "$izopen_conf_proxychains_conf" ]]; then
+      tunnel_port_use=$(grep -E '^socks5' "$izopen_conf_proxychains_conf" 2>/dev/null | awk '{print $3}')
+    fi
 
-    # Request if we must use the last used port
+    # Fallback: get the most recently used tunnel from JSON if proxy.conf doesn't exist
+    # This works by sorting all tunnels by last_used timestamp and taking the most recent
+    if [[ -z "$tunnel_port_use" && -e "$izopen_conf_tunnels_json" ]]; then
+      tunnel_port_use=$(jq -r '.tunnels | to_entries | sort_by(.value.last_used) | reverse | .[0].value.port // empty' "$izopen_conf_tunnels_json" 2>/dev/null)
+    fi
+
+    # Request if we must use the last used port (or enter a new one if empty)
     tunnel_port_use=$(dialog_entry_port "$tunnel_port_use" "$tunnel_port_min" "$tunnel_port_max")
   fi
 
-  # Note: Port is now stored only in proxy.conf (written by helper_tunnel_manage)
-  # No need to write to separate tunnel.conf file (eliminated redundancy)
+  # Note: Port is now stored in tunnels.json (per-host) and proxy.conf (last global)
+  # No need for separate tunnel.conf file (eliminated redundancy)
 }
 
 # Manage SSH tunnel creation and usage based on schema and flags
