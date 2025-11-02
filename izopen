@@ -31,7 +31,7 @@ VERSION_DATE="20251102"
 #   cp izopen ~/bin   # or /usr/local/bin for system-wide
 #
 # Install dependencies (Fedora/RHEL):
-#   sudo dnf install -y proxychains-ng xdg-utils yad zenity kdialog \
+#   sudo dnf install -y jq proxychains-ng xdg-utils yad zenity kdialog \
 #     openssh-clients sshpass telnet nmap-ncat xsel wl-clipboard \
 #     freerdp remmina keepassxc krdc tigervnc
 #
